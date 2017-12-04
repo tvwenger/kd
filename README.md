@@ -98,3 +98,16 @@ The following packages are required for this module to work "out-of-the-box"
 2. `scipy`
 3. `matplotlib`
 4. `pyqt_fit`
+
+Note: I had a lot of trouble installing `pyqt_fit`. I used my default anaconda (python 3) enviroment, and attempted to install `pyqt_fit` via
+```bash
+pip install pyqt_fit
+```
+with no luck. I was able to get it to work with
+```bash
+easy_install pyqt_fit
+```
+but then `path.py` was messed up. The fix for that was
+```bash
+pip install -I path.py==7.7.1
+```
