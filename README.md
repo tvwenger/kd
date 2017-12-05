@@ -24,7 +24,7 @@ This module includes two rotation curves:
 1. Brand, J., & Blitz, L. 1993, A&A, 275, 67 (`brand_rotcurve.py`)
 2. Reid, M. J., Menten, K. M., Brunthaler, A., et al. 2014, ApJ, 783, 130 (`reid14_rotcurve.py`)
 
-These rotation curve scripts, any any new rotation curve scripts you wish to add, *must* include the following two functions:
+These rotation curve scripts, and any new rotation curve scripts you wish to add, *must* include the following two functions:
 1. `calc_theta(R)` which returns the circular orbital speed, `theta`, at a given Galactocentric radius, `R`
 2. `calc_vlsr(glong, dist)` which returns the LSR velocity at a given Galactic longitude, `glong`, and distance, `dist`
 
