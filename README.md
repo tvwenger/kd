@@ -101,15 +101,15 @@ The following packages are required for this module to work "out-of-the-box"
 3. `matplotlib`
 4. `pyqt_fit`
 
-Note: I had a lot of trouble installing `pyqt_fit`. I used my default anaconda (python 3) enviroment, and attempted to install `pyqt_fit` via
+In principle, you should be able to install these requirements via
 ```bash
-pip install pyqt_fit
+pip install -r requirements.txt
 ```
-with no luck. I was able to get it to work with
+but, unfortunately, this will fail when installing `pyqt_fit`. It works correctly with `easy_install` via
 ```bash
-easy_install pyqt_fit
+easy_install `cat requirements.txt`
 ```
-but then `path.py` was messed up. The fix for that was
+If you try to load the `pdf_kd` script and encounter `ImportError: cannot import name 'path'`, try 
 ```bash
 pip install -I path.py==7.7.1
 ```
