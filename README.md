@@ -1,5 +1,7 @@
 # kd
-Utilities to calculate kinematic distances and kinematic distance uncertainties. See (TBD, paper submitted). An on-line tool which uses this code to compute kinematic distances is available here (TBD).
+Utilities to calculate kinematic distances and kinematic distance uncertainties. See (TBD, paper submitted). An on-line tool which uses this code to compute kinematic distances is available here (TBD). If you use this work, please reference both the code and the paper:
+1. TBD
+2. TBD
 
 ## General Utilities
 The script `kd_utils.py` includes several functions relevant to computing kinematic distances:
