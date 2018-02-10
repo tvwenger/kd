@@ -3,6 +3,26 @@ Utilities to calculate kinematic distances and kinematic distance uncertainties.
 1. TBD
 2. TBD
 
+## Requirements
+The following packages are required for this module to work "out-of-the-box"
+1. `numpy`
+2. `scipy`
+3. `matplotlib`
+4. `pyqt_fit`
+
+In principle, you should be able to install these requirements via
+```bash
+pip install -r requirements.txt
+```
+but, unfortunately, this will fail when installing `pyqt_fit`. It works correctly with `easy_install` via
+```bash
+easy_install `cat requirements.txt`
+```
+If you try to load the `pdf_kd` script and encounter `ImportError: cannot import name 'path'`, try 
+```bash
+pip install -I path.py==7.7.1
+```
+
 ## General Utilities
 The script `kd_utils.py` includes several functions relevant to computing kinematic distances:
 1. `calc_Rgal(glong,dist)` computes the Galactocentric radius for a given Galactic longitude, `glong`, and distance, `dist`
@@ -24,7 +44,7 @@ This module includes two rotation curves:
 1. Brand, J., & Blitz, L. 1993, A&A, 275, 67 (`brand_rotcurve.py`)
 2. Reid, M. J., Menten, K. M., Brunthaler, A., et al. 2014, ApJ, 783, 130 (`reid14_rotcurve.py`)
 
-These rotation curve scripts, any any new rotation curve scripts you wish to add, *must* include the following two functions:
+These rotation curve scripts, and any new rotation curve scripts you wish to add, *must* include the following two functions:
 1. `calc_theta(R)` which returns the circular orbital speed, `theta`, at a given Galactocentric radius, `R`
 2. `calc_vlsr(glong, dist)` which returns the LSR velocity at a given Galactic longitude, `glong`, and distance, `dist`
 
@@ -92,24 +112,4 @@ pdf_kd.pdf_kd(glong,velo,velo_err=velo_err,rotcurve=rotcurve,num_samples=num_sam
 # 'vlsr_tangent_err_neg': 7.8548626921567717,         Uncertainty toward negative LSR velocity (km/s)
 # 'vlsr_tangent_err_pos': 12.084404141779657,         Uncertainty toward positive LSR velocity (km/s)
 # 'vlsr_tangent_kde': <scipy.stats.kde.gaussian_kde at 0x7fc41ee2f828>} KDE fit to vlsr_tangent PDF
-```
-
-## Requirements
-The following packages are required for this module to work "out-of-the-box"
-1. `numpy`
-2. `scipy`
-3. `matplotlib`
-4. `pyqt_fit`
-
-Note: I had a lot of trouble installing `pyqt_fit`. I used my default anaconda (python 3) enviroment, and attempted to install `pyqt_fit` via
-```bash
-pip install pyqt_fit
-```
-with no luck. I was able to get it to work with
-```bash
-easy_install pyqt_fit
-```
-but then `path.py` was messed up. The fix for that was
-```bash
-pip install -I path.py==7.7.1
 ```
