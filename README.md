@@ -1,7 +1,8 @@
 # Kinematic Distance Utilities
-Utilities to calculate kinematic distances and kinematic distance uncertainties. See (TBD, paper submitted). An on-line tool which uses this code to compute kinematic distances is available here (TBD). If you use this work, please reference both the code and the paper:
-1. TBD
-2. TBD
+Utilities to calculate kinematic distances and kinematic distance uncertainties. See Wenger et al. (2018, in press). An on-line tool which uses this code to compute kinematic distances is available here (http://www.treywenger.com/kd/). If you use this work, please reference both the code and the paper:
+1. Wenger et al. (2018, in press)
+2. https://ascl.net/1712.001
+3. https://zenodo.org/record/1166001
 
 ## Requirements
 The following packages are required for this module to work "out-of-the-box"
