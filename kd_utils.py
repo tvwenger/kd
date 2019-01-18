@@ -6,6 +6,7 @@ Utility functions for rotcurve_kd.py, pdf_kd.py, and rotation curves.
 
 2017-04-12 Trey V. Wenger
 2018-02-10 Trey V. Wenger added correct_vlsr
+2019-01-17 Trey V. Wenger removed pool_wait
 """
 
 import time
@@ -240,57 +241,6 @@ def calc_glong(az, Rgal, R0=8.34):
         return glong[0]
     else:
         return glong
-
-def pool_wait(result,num_items,chunksize):
-    """
-    Wait for a multiprocessing pool to finish. Print out status
-    updates along the way.
-
-    Parameters:
-      result : map_async object
-               The object returned from multiprocessing.map_async
-      num_items : integer
-                  total number of items in the pool
-      chunksize : integer
-                  size of chunks sent to each processor
-
-    Returns: 
-    """
-    start_time = time.time()
-    # figure out how many actual CPU calls there will be
-    cpu_calls = int(num_items/chunksize) + (num_items%chunksize)
-    strf = ("[{0:20s}] {1:.2f}% Done: {2} Left: {3} Time: {4:02}h "
-            "{5:02}m {6:02}s")
-    while not result.ready():
-        remaining_cpu_calls = result._number_left
-        finished_cpu_calls = cpu_calls - remaining_cpu_calls
-        # Estimate remaining runtime
-        if finished_cpu_calls > 0:
-            time_now = time.time()
-            time_per = (time_now-start_time)/finished_cpu_calls
-            time_left = remaining_cpu_calls*time_per
-            time_h = int(time_left/3600.)
-            time_m = int((time_left-3600.*time_h)/60.)
-            time_s = int(time_left-3600.*time_h-60.*time_m)
-        else:
-            time_h = -1
-            time_m = -1
-            time_s = -1
-        print(strf.format('#'*int(20*finished_cpu_calls/cpu_calls),
-                          100*finished_cpu_calls/cpu_calls,
-                          finished_cpu_calls,remaining_cpu_calls,
-                          time_h,time_m,time_s),end='\r')
-        time.sleep(1)
-    end_time = time.time()
-    print(strf.format('#'*(20),100,cpu_calls,0,0,0,0),end='\r')
-    print()
-    # Compute total runtime
-    run_time = end_time-start_time
-    time_h = int(run_time/3600.)
-    time_m = int((run_time-3600.*time_h)/60.)
-    time_s = int(run_time-3600.*time_h-60.*time_m)    
-    print("Runtime: {0:02}h {1:02}m {2:02}s".\
-          format(time_h,time_m,time_s))
 
 def correct_vlsr(glong, glat, vlsr, e_vlsr,
                  Ustd=10.27, Vstd=15.32, Wstd=7.74,

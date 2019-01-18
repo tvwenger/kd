@@ -7,11 +7,12 @@ uncertainties using the new probability distribution function (PDF)
 method.
 
 2017-04-12 Trey V. Wenger
+2018-01-17 Trey V. Wenger - removed multiprocessing. The overhead
+  of multiprocessing dominated the computation time.
 """
 
 import time
 import importlib
-import multiprocessing as mp
 
 import numpy as np
 from scipy.stats.kde import gaussian_kde
@@ -26,17 +27,16 @@ from pyqt_fit import kde_methods
 from kd import kd_utils
 from kd.rotcurve_kd import rotcurve_kd
 
-def _rotcurve_kd_worker(num_samples,glong=None,velo=None,
-                        velo_err=None,rotcurve='reid14_rotcurve',
-                        rotcurve_dist_res=1.e-2,
-                        rotcurve_dist_max=30.):
+def rotcurve_kd_worker(num_samples,glong,velo,
+                       velo_err=None,rotcurve='reid14_rotcurve',
+                       rotcurve_dist_res=1.e-2,
+                       rotcurve_dist_max=30.):
     """
-    Multiprocessing worker for pdf_kd. Resamples velocity and
-    runs rotcurve_kd.
+    Resamples velocity and runs rotcurve_kd.
     
     Parameters:
       num_samples : integer
-                    number of samples this worker should run
+                    number of samples
       glong : scalar or 1-D array 
               Galactic longitude (deg). If it is an array, it must
               have the same size as velo.
@@ -59,7 +59,10 @@ def _rotcurve_kd_worker(num_samples,glong=None,velo=None,
                           rotcurve_kd (kpc)
     
     Returns: output
-      (same as rotcurve_kd)
+      output : list of rotcurve_kd output for each (glong, velo).
+               For example, output[0]["Rgal"] contains the 1-D array 
+               of Galactocentric radii calculated for the first 
+               (glong, velo) point and each sample.
 
     Raises:
       ValueError : if glong and velo are not 1-D; or
@@ -96,39 +99,27 @@ def _rotcurve_kd_worker(num_samples,glong=None,velo=None,
               for (l,v) in zip(glong_inp,velo_resample)]
     return kd_out
 
-def _pdf_kd_results_worker(inputs,pdf_bins=100):
+def pdf_kd_results_worker(kd_samples, kdetype, pdf_bins=100):
     """
-    Multiprocessing worker for pdf_kd. Finds the kinematic distance
-    and distance uncertainty from the output of many samples from
-    rotcurve_kd. See pdf_kd for more details.
+    Finds the kinematic distance and distance uncertainty from the 
+    output of many samples from rotcurve_kd. See pdf_kd for more 
+    details.
 
     Parameters:
-      input : (kd_samples, kd_out_ind, kdtype, kdetype)
-        kd_samples : 1-D array
-                     This array contains the output from rotcurve_kd
-                     for a kinematic distance (kpc) of type kdtype for
-                     many samples (i.e. it is the "Rgal" array from
-                     rotcurve_kd output)
-        kd_out_ind : integer
-                     The index of the rotcurve_kd output corresponding
-                     to the data in kd_samples.
-        kdtype : string
-                 The type of kinematic distance in kd_samples
-        kdetype : string
-                  which KDE method to use
-                  'pyqt' uses pyqt_fit with linear combination
-                         and boundary at 0
-                  'scipy' uses gaussian_kde with no boundary
+      kd_samples : 1-D array
+                   This array contains the output from rotcurve_kd
+                   for a kinematic distance (kpc) for
+                   many samples (i.e. it is the "Rgal" array from
+                   rotcurve_kd output)
+      kdetype : string
+                which KDE method to use
+                'pyqt' uses pyqt_fit with linear combination
+                   and boundary at 0
+                'scipy' uses gaussian_kde with no boundary
       pdf_bins : integer (optional)
                  number of bins used in calculating PDF
 
-
-    Returns: (kd_out_ind, kdtype, kde, peak_dist, peak_dist_err_neg,
-              peak_dist_err_pos)
-      kd_out_ind : integer
-                   Same as input
-      kdtype : string
-               Same as input
+    Returns: kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos
       kde : scipy.gaussian_kde object
             The KDE calculated for this kinematic distance
       peak_dist : scalar
@@ -139,16 +130,12 @@ def _pdf_kd_results_worker(inputs,pdf_bins=100):
                       The positive uncertainty of peak_dist
     """
     #
-    # Unpack inputs
-    #
-    kd_samples, kd_out_ind, kdtype, kdetype = inputs
-    #
     # Compute kernel density estimator and PDF
     #
     nans = np.isnan(kd_samples)
-    if np.all(nans):
-        # skip if all nans
-        return (kd_out_ind, kdtype, None, np.nan, np.nan, np.nan)
+    if np.sum(~nans) < 2:
+        # skip if fewer than two non-nans
+        return (None, np.nan, np.nan, np.nan)
     try:
         if kdetype == 'scipy':
             kde = gaussian_kde(kd_samples[~nans])
@@ -157,10 +144,10 @@ def _pdf_kd_results_worker(inputs,pdf_bins=100):
                                  method=kde_methods.linear_combination)
         else:
             print("INVALIDE KDE METHOD: {0}".format(kdetype))
-            return (kd_out_ind, kdtype, None, np.nan, np.nan, np.nan)
+            return (None, np.nan, np.nan, np.nan)
     except np.linalg.LinAlgError:
         # catch singular matricies (i.e. all values are the same)
-        return (kd_out_ind, kdtype, None, np.nan, np.nan, np.nan)
+        return (None, np.nan, np.nan, np.nan)
     dists = np.linspace(np.nanmin(kd_samples),np.nanmax(kd_samples),
                         pdf_bins)
     pdf = kde(dists)
@@ -170,6 +157,9 @@ def _pdf_kd_results_worker(inputs,pdf_bins=100):
     peak_ind = np.argmax(pdf)
     peak_value = pdf[peak_ind]
     peak_dist = dists[peak_ind]
+    if np.isnan(peak_value):
+        # too few good samples?
+        return (None, np.nan, np.nan, np.nan)
     #
     # Walk down from peak of PDF until integral between two
     # bounds is 68.3% of the total integral (=1 because it's
@@ -193,20 +183,17 @@ def _pdf_kd_results_worker(inputs,pdf_bins=100):
             peak_dist_err_pos = dists[upper]-peak_dist
             break
     else:
-        return (kd_out_ind, kdtype, None, np.nan, np.nan, np.nan)
+        return (None, np.nan, np.nan, np.nan)
     #
     # Return results
     #
-    return(kd_out_ind, kdtype, kde, peak_dist, peak_dist_err_neg,
-           peak_dist_err_pos)
+    return (kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos)
 
 def pdf_kd(glong,velo,velo_err=None,
            rotcurve='reid14_rotcurve',
            rotcurve_dist_res=1.e-3,
            rotcurve_dist_max=30.,
-           pdf_bins=100,
-           num_samples=1000,
-           num_cpu=mp.cpu_count(),chunksize=10,
+           pdf_bins=100,num_samples=1000,
            plot_pdf=False,plot_prefix='pdf_',verbose=True):
     """
     Return the kinematic near, far, and tanget distance and distance
@@ -242,11 +229,6 @@ def pdf_kd(glong,velo,velo_err=None,
                  number of bins used to calculate PDF
       num_samples : integer (optional)
                     Number of MC samples to use when generating PDF
-      num_cpu : integer (optional)
-                Number of CPUs to use in multiprocessing.
-                If 0, do not use multiprocessing.
-      chunksize : integer (optional)
-                  Number of tasks per CPU in multiprocessing.
       plot_pdf : bool (optional)
                  If True, plot each PDF. Filenames are
                  plot_prefix+"{0}glong_{1}velo.pdf".
@@ -329,54 +311,6 @@ def pdf_kd(glong,velo,velo_err=None,
     if glong_inp.size != velo_inp.size:
         raise ValueError("glong and velo must have same size")
     #
-    # Set-up multiprocesing for rotcurve re-sampling
-    #
-    num_chunks = int(num_samples/chunksize)
-    jobs = [chunksize for c in range(num_chunks)]
-    worker = partial(_rotcurve_kd_worker,
-                     glong=glong_inp,velo=velo_inp,
-                     velo_err=velo_err,rotcurve=rotcurve,
-                     rotcurve_dist_res=rotcurve_dist_res,
-                     rotcurve_dist_max=rotcurve_dist_max)
-    if num_samples % chunksize > 0:
-        jobs = jobs + [num_samples % chunksize]
-    if num_cpu > 0:
-        #
-        # Calculate rotcurve kinematic distance for each l,v point in
-        # parallel
-        #
-        if verbose:
-            print("Starting multiprocessing for rotation curve "
-                  "re-sampling...")
-        pool = mp.Pool(processes=num_cpu)
-        result = pool.map_async(worker,jobs,chunksize=1)
-        if verbose:
-            kd_utils.pool_wait(result,len(jobs),1)
-        else:
-            while not result.ready():
-                time.sleep(1)
-        pool.close()
-        pool.join()
-        result = result.get()
-    else:
-        #
-        # Calculate rotcurve kinematic distance in series
-        #
-        result = [worker(job) for job in jobs]
-    #
-    # Concatenate results from multiprocessing
-    #
-    kd_out = [{"Rgal":np.array([]),"Rtan":np.array([]),
-               "near":np.array([]),"far":np.array([]),
-               "tangent":np.array([]),"vlsr_tangent":np.array([])}
-               for i in range(glong_inp.size)]
-    for r in result:
-        for i in range(glong_inp.size):
-            for kdtype in ("Rgal","Rtan","near","far","tangent",
-                           "vlsr_tangent"):
-                kd_out[i][kdtype] = \
-                  np.append(kd_out[i][kdtype],r[i][kdtype])
-    #
     # Storage for final PDF kinematic distance results
     #
     results = {"Rgal": np.zeros(glong_inp.size),
@@ -410,49 +344,27 @@ def pdf_kd(glong,velo,velo_err=None,
                "vlsr_tangent_err_neg": np.zeros(glong_inp.size),
                "vlsr_tangent_err_pos": np.zeros(glong_inp.size)}
     #
-    # Set up multiprocessing for PDF kinematic distance calculation
+    # Calculate rotcurve kinematic distance
     #
-    jobs = []
-    for i,out in enumerate(kd_out):
-        for kdtype,kdetype in \
-            zip(["Rgal","Rtan","near","far","tangent","vlsr_tangent"],
-                ["pyqt","pyqt","pyqt","pyqt","pyqt","scipy"]):
-            jobs.append((out[kdtype],i,kdtype,kdetype))
-    worker = partial(_pdf_kd_results_worker,
-                     pdf_bins=pdf_bins)
-    if num_cpu > 0:
-        #
-        # Calculate PDF kinematic distance for each l,v point in
-        # parallel
-        #
-        if verbose:
-            print("Starting multiprocessing for PDF kinematic "
-                  "distance calculation...")
-        pool = mp.Pool(processes=num_cpu)
-        result = pool.map_async(worker,jobs,chunksize=1)
-        if verbose:
-            kd_utils.pool_wait(result,len(jobs),1)
-        else:
-            while not result.ready():
-                time.sleep(1)
-        pool.close()
-        pool.join()
-        result = result.get()
-    else:
-        #
-        # Calculate PDF kinematic distance in series
-        #
-        result = [worker(job) for job in jobs]
+    kd_out = rotcurve_kd_worker(num_samples,glong_inp,velo_inp,
+                                velo_err=velo_err,rotcurve=rotcurve,
+                                rotcurve_dist_res=rotcurve_dist_res,
+                                rotcurve_dist_max=rotcurve_dist_max)
     #
-    # Unpack results and save
+    # Calculate PDF kinematic distance
     #
-    for r in result:
-        kd_out_ind, kdtype, kde, peak_dist, peak_dist_err_neg, \
-          peak_dist_err_pos = r
-        results[kdtype][kd_out_ind] = peak_dist
-        results[kdtype+"_kde"][kd_out_ind] = kde
-        results[kdtype+"_err_neg"][kd_out_ind] = peak_dist_err_neg
-        results[kdtype+"_err_pos"][kd_out_ind] = peak_dist_err_pos
+    for kdtype,kdetype in \
+        zip(["Rgal","Rtan","near","far","tangent","vlsr_tangent"],
+            ["pyqt","pyqt","pyqt","pyqt","pyqt","scipy"]):
+        for i,my_kd_out in enumerate(kd_out):
+            my_pdfkd_out = pdf_kd_results_worker(my_kd_out[kdtype], kdetype,
+                                                 pdf_bins=pdf_bins)
+            kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos = \
+                my_pdfkd_out
+            results[kdtype][i] = peak_dist
+            results[kdtype+"_kde"][i] = kde
+            results[kdtype+"_err_neg"][i] = peak_dist_err_neg
+            results[kdtype+"_err_pos"][i] = peak_dist_err_pos            
     #
     # Plot PDFs and results
     #
