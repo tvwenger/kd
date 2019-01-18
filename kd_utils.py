@@ -11,6 +11,7 @@ Utility functions for rotcurve_kd.py, pdf_kd.py, and rotation curves.
                           kinematic distance uncertainties
 """
 
+import os
 import time
 import numpy as np
 from scipy.io import readsav
@@ -383,7 +384,8 @@ def calc_anderson2012_uncertainty(glong, vlsr):
     #
     # Read Anderson+2012 uncertainty data
     #
-    a12data = readsav("data/curve_data_wise_small.sav",python_dict=True)
+    a12file = os.path.join(os.path.dirname(__file__),'data','curve_data_wise_small.sav')
+    a12data = readsav(a12file,python_dict=True)
     a12data = a12data['curve_data_wise_small'][0]
     a12_near_err = a12data['big_percentages_near']/100.
     a12_far_err = a12data['big_percentages_far']/100.
