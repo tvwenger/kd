@@ -6,11 +6,14 @@ Utility functions for rotcurve_kd.py, pdf_kd.py, and rotation curves.
 
 2017-04-12 Trey V. Wenger
 2018-02-10 Trey V. Wenger added correct_vlsr
-2019-01-17 Trey V. Wenger removed pool_wait
+2019-01-18 Trey V. Wenger removed pool_wait
+                          added function to compute Anderson+2012
+                          kinematic distance uncertainties
 """
 
 import time
 import numpy as np
+from scipy.io import readsav
 
 def calc_Rgal(glong, dist, R0=8.34):
     """
@@ -341,3 +344,68 @@ def correct_vlsr(glong, glat, vlsr, e_vlsr,
         return new_vlsr[0],e_new_vlsr[0]
     else:
         return new_vlsr,e_new_vlsr
+
+def calc_anderson2012_uncertainty(glong, vlsr):
+    """
+    Return the Anderson+2012 kinematic distance uncertainties.
+
+    Parameters:
+      glong : scalar or 1-D array
+              Galactic longitude (deg). If it is an array, it must
+              have the same size as vlsr
+      vlsr : scalar or 1-D array
+             Measured LSR velocity (km/s). If it is an array, it
+             must have the same size as glong, glat, and e_vlsr.
+
+    Returns: (near_err, far_err, tangent_err)
+      near_err : scalar or 1-D array
+                 Anderson+2012 near distance uncertainty
+      far_err : scalar or 1-D array
+                Anderson+2012 tangent distance uncertainty
+      tangent_err : scalar or 1-D array
+                    Anderson+2012 far distance uncertainty
+
+    Raises:
+      ValueError : if glong and vlsr are not 1-D; or
+                   if glong and vlsr are arrays and 
+                   not the same size
+    """
+    #
+    # check inputs
+    #
+    # convert scalar to array if necessary
+    glong_inp, vlsr_inp =  np.atleast_1d(glong, vlsr)
+    # check shape of inputs
+    if (glong_inp.ndim != 1 or vlsr_inp.ndim != 1):
+        raise ValueError("glong and vlsr must be 1-D")
+    if glong_inp.size != 1 and glong_inp.size != vlsr_inp.size:
+        raise ValueError("glong and vlsr must have same size")
+    #
+    # Read Anderson+2012 uncertainty data
+    #
+    a12data = readsav("data/curve_data_wise_small.sav",python_dict=True)
+    a12data = a12data['curve_data_wise_small'][0]
+    a12_near_err = a12data['big_percentages_near']/100.
+    a12_far_err = a12data['big_percentages_far']/100.
+    a12_glongs = a12data['glong']
+    a12_vlsrs = a12data['velbinning']
+    #
+    # find matching longitudes and velocities
+    #
+    best_glong = np.array([np.nanargmin(np.abs(gl-a12_glongs))
+                           for gl in glong_inp])
+    best_vlsr = np.array([np.nanargmin(np.abs(vl-a12_vlsrs))
+                          for vl in vlsr_inp])
+    #
+    # Get distance uncertainties
+    #
+    near_err = np.array(a12_near_err[best_glong,best_vlsr])
+    far_err = np.array(a12_far_err[best_glong,best_vlsr])
+    tangent_err = np.nanmax(np.vstack((near_err,far_err)),axis=0)
+    #
+    # Convert back to scalar if necessary
+    #
+    if glong_inp.size == 1:
+        return near_err[0],far_err[0],tangent_err[0]
+    else:
+        return near_err,far_err,tangent_err
