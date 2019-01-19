@@ -16,7 +16,6 @@ import importlib
 
 import numpy as np
 from scipy.stats.kde import gaussian_kde
-from functools import partial
 
 import matplotlib.pyplot as plt
 
@@ -24,7 +23,6 @@ from scipy import integrate
 from pyqt_fit import kde as pyqt_kde
 from pyqt_fit import kde_methods
 
-from kd import kd_utils
 from kd.rotcurve_kd import rotcurve_kd
 
 def rotcurve_kd_worker(num_samples,glong,velo,
@@ -120,7 +118,7 @@ def pdf_kd_results_worker(kd_samples, kdetype, pdf_bins=100):
                  number of bins used in calculating PDF
 
     Returns: kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos
-      kde : scipy.gaussian_kde object
+      kde : scipy.gaussian_kde object or pyqt_kde.KDE1D object
             The KDE calculated for this kinematic distance
       peak_dist : scalar
                   The distance associated with the peak of the PDF
@@ -246,6 +244,8 @@ def pdf_kd(glong,velo,velo_err=None,
       output["Rgal_err_pos"] : scalar or 1-D array
                                Galactocentric radius uncertainty in
                                the positive direction (kpc).
+      output["Rgal_kde"] : PyQTFit Kenel Density Estimator
+                           The KDE for Galactocentric radius.
       output["Rtan"] : scalar or 1-D array
                        Galactocentric radius of tangent point (kpc).
       output["Rtan_err_neg"] : scalar or 1-D array
@@ -256,6 +256,9 @@ def pdf_kd(glong,velo,velo_err=None,
                                Galactocentric radius of tangent point
                                uncertainty in the positive direction
                                (kpc).
+      output["Rtan_kde"] : PyQTFit Kenel Density Estimator
+                           The KDE for Galactocentric radius of 
+                           tangent point.
       output["near"] : scalar or 1-D array
                        kinematic near distance (kpc)
       output["near_err_neg"] : scalar or 1-D array
@@ -264,6 +267,8 @@ def pdf_kd(glong,velo,velo_err=None,
       output["near_err_pos"] : scalar or 1-D array
                                kinematic near distance uncertainty
                                in the positive direction (kpc)
+      output["near_kde"] : PyQTFit Kenel Density Estimator
+                           The KDE for near kinematic distance
       output["far"] : scalar or 1-D array
                       kinematic far distance (kpc)
       output["far_err_neg"] : scalar or 1-D array
@@ -272,6 +277,8 @@ def pdf_kd(glong,velo,velo_err=None,
       output["far_err_pos"] : scalar or 1-D array
                               kinematic far distance uncertainty in
                               the positive direction (kpc)
+      output["far_kde"] : PyQTFit Kenel Density Estimator
+                          The KDE for far kinematic distance.
       output["tangent"] : scalar or 1-D array
                           kinematic tangent distance (kpc)
       output["tangent_err_neg"] : scalar or 1-D array
@@ -282,6 +289,8 @@ def pdf_kd(glong,velo,velo_err=None,
                                   kinematic tangent distance
                                   uncertainty in the positive
                                   direction (kpc)
+      output["tangent_kde"] : PyQTFit Kenel Density Estimator
+                              The KDE for kinematic tangent distance.
       output["vlsr_tangent"] : scalar or 1-D array
                                LSR velocity of tangent point (km/s)
       output["vlsr_tangent_err_neg"] : scalar or 1-D array
@@ -292,6 +301,9 @@ def pdf_kd(glong,velo,velo_err=None,
                                        LSR velocity of tangent
                                        uncertainty in the positive
                                        direction (km/s)
+      output["vlsr_tangent_kde"] : Scipy Kenel Density Estimator
+                                   The KDE for LSR velocity of
+                                   tangent distance.
       If glong and velo are scalars, each of these is a scalar.
       Otherwise they have shape (velo.size).
 
