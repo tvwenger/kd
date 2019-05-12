@@ -11,11 +11,16 @@ The following packages are required for this module to work "out-of-the-box"
 3. `matplotlib`
 4. `pyqt_fit`
 
-In principle, you should be able to install these requirements via
+The easiest way to install this package is
+```bash
+python setup.py install
+```
+
+If that doesn't work, then you can install the dependencies manually via
 ```bash
 pip install -r requirements.txt
 ```
-but, unfortunately, this will fail when installing `pyqt_fit`. It works correctly with `easy_install` via
+This may fail when installing `pyqt_fit`. It works correctly with `easy_install` via
 ```bash
 easy_install `cat requirements.txt`
 ```
@@ -30,6 +35,8 @@ The script `kd_utils.py` includes several functions relevant to computing kinema
 2. `calc_az(glong,dist)` computes the Galactocentric azimuth for a given Galactic longitude, `glong`, and distance, `dist`
 3. `calc_dist(az,Rgal)` computes the distance of a given Galactocentric radius, `Rgal`, and azimuth, `az`
 4. `calc_glong(az,Rgal)` computes the Galactic longitude of a given Galactocentric radius, `Rgal`, and azimuth, `az`
+5. `correct_vlsr(glong,glat,vlsr,e_vlsr)` computes the corrected LSR velocities and velocity uncertainties given updated solar motion parameters.
+6. `calc_anderson2012_uncertainty(glong,vlsr)` returns the Anderson et al. (2012) kinematic distance uncertainties.
 
 Each of these functions may be invoked to compute the value at a given position or multiple positions at once:
 ```python
