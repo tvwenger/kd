@@ -9,24 +9,18 @@ The following packages are required for this module to work "out-of-the-box"
 1. `numpy`
 2. `scipy`
 3. `matplotlib`
-4. `pyqt_fit`
+4. `pyqt_fit` (N.B. The currently available version on PyPI, as of January 2020, has a dependency issue. I have [forked the repository](https://github.com/tvwenger/pyqt-fit) and corrected the issue.)
 
 The easiest way to install this package is
 ```bash
-python setup.py install
+pip install git+https://github.com/tvwenger/pyqt-fit.git
+pip install git+https://github.com/tvwenger/kd.git
 ```
 
-If that doesn't work, then you can install the dependencies manually via
+Alternatively, download the code and install:
 ```bash
-pip install -r requirements.txt
-```
-This may fail when installing `pyqt_fit`. It works correctly with `easy_install` via
-```bash
-easy_install `cat requirements.txt`
-```
-If you try to load the `pdf_kd` script and encounter `ImportError: cannot import name 'path'`, try 
-```bash
-pip install -I path.py==7.7.1
+git clone git+https://github.com/tvwenger/pyqt-fit.git; cd pyqt-fit; python setup.py install; cd ..
+git clone git+https://github.com/tvwenger/kd.git; cd kd; python setup.py install; cd ..
 ```
 
 ## General Utilities
