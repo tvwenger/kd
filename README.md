@@ -19,8 +19,8 @@ pip install git+https://github.com/tvwenger/kd.git
 
 Alternatively, download the code and install:
 ```bash
-git clone git+https://github.com/tvwenger/pyqt-fit.git; cd pyqt-fit; python setup.py install; cd ..
-git clone git+https://github.com/tvwenger/kd.git; cd kd; python setup.py install; cd ..
+git clone https://github.com/tvwenger/pyqt-fit.git; cd pyqt-fit; python setup.py install; cd ..
+git clone https://github.com/tvwenger/kd.git; cd kd; python setup.py install; cd ..
 ```
 
 ## General Utilities
