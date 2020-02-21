@@ -1,8 +1,15 @@
 # Kinematic Distance Utilities
 Utilities to calculate kinematic distances and kinematic distance uncertainties. [See Wenger et al. (2018)](http://adsabs.harvard.edu/abs/2018ApJ...856...52W). An on-line tool which uses this code to compute kinematic distances is available here (http://www.treywenger.com/kd/). If you use this work, please reference both the code and the paper:
-1. [Wenger et al. (2018)](http://adsabs.harvard.edu/abs/2018ApJ...856...52W)
+1. [Wenger et al. (2018)](http://ui.adsabs.harvard.edu/abs/2018ApJ...856...52W)
 2. https://ascl.net/1712.001
 3. https://zenodo.org/record/1166001
+
+## New in Version 2.0
+1. Added support for [Reid et al. (2019)](https://ui.adsabs.harvard.edu/abs/2019ApJ...885..131R/abstract) rotation curve.
+2. Added parameter covariences for Reid et al. (2019) rotation curve.
+3. Fixed minor bug in Reid et al. (2014) rotation curve.
+4. Updated distance uncertainties to use minimum width Bayesian credible interval (BCI).
+5. General improvements in readability and performance.
 
 ## Requirements
 The following packages are required for this module to work "out-of-the-box"
@@ -25,12 +32,13 @@ git clone https://github.com/tvwenger/kd.git; cd kd; python setup.py install; cd
 
 ## General Utilities
 The script `kd_utils.py` includes several functions relevant to computing kinematic distances:
-1. `calc_Rgal(glong,dist)` computes the Galactocentric radius for a given Galactic longitude, `glong`, and distance, `dist`
-2. `calc_az(glong,dist)` computes the Galactocentric azimuth for a given Galactic longitude, `glong`, and distance, `dist`
-3. `calc_dist(az,Rgal)` computes the distance of a given Galactocentric radius, `Rgal`, and azimuth, `az`
-4. `calc_glong(az,Rgal)` computes the Galactic longitude of a given Galactocentric radius, `Rgal`, and azimuth, `az`
-5. `correct_vlsr(glong,glat,vlsr,e_vlsr)` computes the corrected LSR velocities and velocity uncertainties given updated solar motion parameters.
-6. `calc_anderson2012_uncertainty(glong,vlsr)` returns the Anderson et al. (2012) kinematic distance uncertainties.
+1. `calc_Rgal(glong, dist)` computes the Galactocentric radius for a given Galactic longitude, `glong`, and distance, `dist`
+2. `calc_az(glong, dist)` computes the Galactocentric azimuth for a given Galactic longitude, `glong`, and distance, `dist`
+3. `calc_dist(az, Rgal)` computes the distance of a given Galactocentric radius, `Rgal`, and azimuth, `az`
+4. `calc_glong(az, Rgal)` computes the Galactic longitude of a given Galactocentric radius, `Rgal`, and azimuth, `az`
+5. `correct_vlsr(glong, glat, vlsr)` computes the corrected LSR velocity given updated solar motion parameters.
+6. `calc_anderson2012_uncertainty(glong, vlsr)` returns the Anderson et al. (2012) kinematic distance uncertainties.
+7. `calc_hpd(samples)` returns the kernel density estimator (KDE) fit to some samples, as well as the mode (most likely value) and highest posterior density (HPD), which is the minimum width Bayesian credible interval (BCI).
 
 Each of these functions may be invoked to compute the value at a given position or multiple positions at once:
 ```python
@@ -42,13 +50,16 @@ kd_utils.calc_Rgal(glong,dist) # array([  5.93461783,  12.17226711]) (kpc)
 ```
 
 ## Rotation Curves
-This module includes two rotation curves: 
+This module includes three rotation curves: 
 1. Brand, J., & Blitz, L. 1993, A&A, 275, 67 (`brand_rotcurve.py`)
 2. Reid, M. J., Menten, K. M., Brunthaler, A., et al. 2014, ApJ, 783, 130 (`reid14_rotcurve.py`)
+3. Reid, M. J., Menten, K. M., Brunthaler, A., et al. 2019, ApJ, 885, 131 (`reid19_rotcurve.py`)
 
-These rotation curve scripts, and any new rotation curve scripts you wish to add, *must* include the following two functions:
-1. `calc_theta(R)` which returns the circular orbital speed, `theta`, at a given Galactocentric radius, `R`
-2. `calc_vlsr(glong, dist)` which returns the LSR velocity at a given Galactic longitude, `glong`, and distance, `dist`
+These rotation curve scripts, and any new rotation curve scripts you wish to add, *must* include the following four functions:
+1. `params_nominal()` which returns the nominal rotation curve parameters as a dictionary
+2. `params_resample(size)` which returns resampled rotation curve parameters as a dictionary
+3. `calc_theta(R)` which returns the circular orbital speed, `theta`, at a given Galactocentric radius, `R`
+4. `calc_vlsr(glong, dist)` which returns the LSR velocity at a given Galactic longitude, `glong`, and distance, `dist`
 
 These scripts may be invoked to compute the circular orbit speed or LSR velocity for a single position or multiple positions at once:
 
@@ -60,7 +71,6 @@ reid14_rotcurve.calc_theta(R) # array([ 223.40500419,  238.51262935]) (km/s)
 glong = np.array([30.,130.])
 dist = np.array([3.,5.])
 reid14_rotcurve.calc_vlsr(glong,dist) # (array([ 46.94466602, -58.85105356]), (km/s)
-                                      # {'R0': 8.34, 'a1': 241.0, 'a2': 0.9, 'a3': 1.46}) (rotation curve parameters)
 ```
 
 ## Traditional Kinematic Distance

@@ -1,19 +1,37 @@
 #!/usr/bin/env python
 """
-reid_rotcurve.py
+reid14_rotcurve.py
 
 Utilities involving the Universal Rotation Curve (Persic+1996) from
 Reid+2014.
 
+Copyright(C) 2017-2020 by
+Trey V. Wenger; tvwenger@gmail.com
+
+GNU General Public License v3 (GNU GPLv3)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 2017-04-12 Trey V. Wenger
+2020-02-19 Trey V. Wenger updates for v2.0
 """
 
 import numpy as np
-
 from kd import kd_utils
 
 #
-# Reid+2014 rotation curve parameters
+# Reid+2014 rotation curve parameters and uncertainties
 #
 __a1 = 241. # km/s V(R_opt)
 __a1_err = 8.
@@ -24,37 +42,62 @@ __a3_err = 0.16
 __R0 = 8.34 # kpc
 __R0_err = 0.16
 
-def calc_theta(R_inp,a1=__a1,a2=__a2,a3=__a3,R0=__R0,resample=False):
+def nominal_params():
     """
-    Return circular orbit speed theta at given Galactocentric radius
-    R.
+    Return a dictionary containing the nominal rotation curve
+    parameters.
+
+    Parameters: Nothing
+
+    Returns: params
+      params :: dictionary
+        params['a1'], etc. : scalar
+          The nominal rotation curve parameter
+    """
+    params = {
+        'a1': __a1, 'a2': __a2, 'a3': __a3, 'R0': __R0}
+    return params
+
+def resample_params(size=None):
+    """
+    Resample the Reid+2014 rotation curve parameters within their
+    uncertainties assuming Gaussian probabilities.
 
     Parameters:
-      R : scalar or 1-D array
-          Galactocentric radius (kpc)
-      a1,a2,a3 : scalars (optional)
-                 Reid+2014 rotation curve parameters
-      R0 : scalar (optional)
-           Solar Galactocentric radius (kpc)
+      size :: integer
+        The number of random samples to generate. If None, generate
+        only one sample and return a scalar.
+
+    Returns: params
+      params :: dictionary
+        params['a1'], etc. : scalar or array of scalars
+                             The re-sampled parameters
+    """
+    params = {
+        'a1': np.random.normal(loc=__a1, scale=__a1_err, size=size),
+        'a2': np.random.normal(loc=__a2, scale=__a2_err, size=size),
+        'a3': np.random.normal(loc=__a3, scale=__a3_err, size=size),
+        'R0': np.random.normal(loc=__R0, scale=__R0_err, size=size)}
+    return params
+
+def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
+    """
+    Return circular orbit speed at a given Galactocentric radius.
+
+    Parameters:
+      R :: scalar or array of scalars
+        Galactocentric radius (kpc)
+
+      a1, a2, a3 :: scalars (optional)
+        Reid+2014 rotation curve parameters
+
+      R0 :: scalar (optional)
+        Solar Galactocentric radius (kpc)
 
     Returns: theta
-      theta : scalar or 1-D array
-              circular orbit speed at R (km/s)
+      theta :: scalar or array of scalars
+        circular orbit speed at R (km/s)
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    R = np.atleast_1d(R_inp)
-    #
-    # Resample rotation curve parameters if necessary
-    #
-    if resample:
-        # resample fit parameters within uncertainty
-        a1 = np.random.normal(loc=__a1,scale=__a1_err)
-        a2 = np.random.normal(loc=__a2,scale=__a2_err)
-        a3 = np.random.normal(loc=__a3,scale=__a3_err)
-        R0 = np.random.normal(loc=__R0,scale=__R0_err)
     #
     # Equations 8, 9, 10, 11a, 11b in Persic+1996
     #
@@ -69,93 +112,55 @@ def calc_theta(R_inp,a1=__a1,a2=__a2,a3=__a3,R0=__R0,resample=False):
     # Catch non-physical case where Vd2 + Vh2 < 0
     #
     Vtot = Vd2 + Vh2
-    Vtot[Vtot < 0.] = np.nan
+    if np.isscalar(Vtot) and Vtot < 0.:
+        Vtot = np.nan
+    elif not np.isscalar(Vtot):
+        Vtot[Vtot < 0.] = np.nan
     #
     # Circular velocity
     #
     theta = a1 * np.sqrt(Vtot)
     return theta
 
-def calc_vlsr(glong, dist, resample=False):
+def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     """
     Return the LSR velocity at a given Galactic longitude and
     line-of-sight distance.
-    If requested, resample rotation curve parameters and R0 within
-    uncertainties assuming Gaussian errors.
 
     Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as dist.
-      dist : scalar or 1-D array
-             line-of-sight distance (kpc). If it is an array, it must
-             have the same size as glong or glong must be a scalar.
-      resample : bool (optional)
-                 if True, resample rotation curve parameters within
-                 uncertainties
+      glong :: scalar or array of scalars
+        Galactic longitude (deg).
 
-    Returns: vlsr, params
-      vlsr : scalar or 1-D array
-             LSR velocity (km/s). If dist is a scalar, it
-             is a scalar. Otherwise it has shape (dist.size).
+      dist :: scalar or array of scalars
+        line-of-sight distance (kpc).
 
-      params : dict of scalars
-        parameters used to calculate vlsr (useful if resample is True)
-        params["R0"] : R0 used in calculation
-        params["a1"] : a1 used in calculation
-        params["a2"] : a2 used in calculation
-        params["a3"] : a3 used in calculation
+      a1, a2, a3 :: scalars (optional)
+        Reid+2014 rotation curve parameters
 
-    Raises:
-      ValueError : if glong or dist are not 1-D; or
-                   if glong and dist are arrays and not the same size
+      R0 :: scalar (optional)
+        Solar Galactocentric radius (kpc)
+
+    Returns: vlsr
+      vlsr :: scalar or array of scalars
+        LSR velocity (km/s).
     """
     #
-    # check inputs
+    # Convert distance to Galactocentric radius, catch small Rgal
     #
-    # convert scalar to array if necessary
-    glong_inp, dist_inp = np.atleast_1d(glong, dist)
-    # check shape of inputs
-    if glong_inp.ndim != 1 or dist_inp.ndim != 1:
-        raise ValueError("glong and dist must be 1-D")
-    if glong_inp.size != 1 and glong_inp.size != dist_inp.size:
-        raise ValueError("glong and dist must have same size, "
-                         "or glong must be a scalar")
+    Rgal = kd_utils.calc_Rgal(glong, dist, R0=R0)
+    if np.isscalar(Rgal) and Rgal < 1.e-6:
+        Rgal = 1.e-6
+    elif not np.isscalar(Rgal):
+        Rgal[Rgal < 1.e-6] = 1.e-6
     #
-    # Resample rotation curve parameters if necessary
+    # Rotation curve circular velocity
     #
-    if resample:
-        # resample fit parameters within uncertainty
-        a1 = np.random.normal(loc=__a1,scale=__a1_err)
-        a2 = np.random.normal(loc=__a2,scale=__a2_err)
-        a3 = np.random.normal(loc=__a3,scale=__a3_err)
-        R0 = np.random.normal(loc=__R0,scale=__R0_err)
-    else:
-        a1 = __a1
-        a2 = __a2
-        a3 = __a3
-        R0 = __R0
-    params = {"R0":R0,"a1":a1,"a2":a2,"a3":a3}
-    #
-    # Convert distance to Galactocentric radius, catch places where
-    # R = 0.
-    #
-    Rgal = kd_utils.calc_Rgal(glong_inp,dist_inp,R0=R0)
-    Rgal = np.atleast_1d(Rgal)
-    Rgal[Rgal < 1.e-6] = 1.e-6
-    #
-    # Reid rotation curve circular velocity
-    #
-    theta = calc_theta(Rgal,a1=a1,a2=a2,a3=a3,R0=R0)
+    theta = calc_theta(
+        Rgal, a1=a1, a2=a2, a3=a3, R0=R0)
+    theta0 = calc_theta(R0, a1=a1, a2=a2, a3=a3, R0=R0)
     #
     # Now take circular velocity and convert to LSR velocity
     #
-    vlsr = R0 * np.sin(np.deg2rad(glong_inp))
-    vlsr = vlsr * ((theta/Rgal) - a1/R0)
-    #
-    # Convert back to scalar if necessary
-    #
-    if dist_inp.size == 1:
-        return vlsr[0],params
-    else:
-        return vlsr,params
+    vlsr = R0 * np.sin(np.deg2rad(glong))
+    vlsr = vlsr * ((theta/Rgal) - (theta0/R0))
+    return vlsr

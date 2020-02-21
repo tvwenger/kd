@@ -4,68 +4,78 @@ kd_utils.py
 
 Utility functions for rotcurve_kd.py, pdf_kd.py, and rotation curves.
 
+Copyright(C) 2017-2020 by
+Trey V. Wenger; tvwenger@gmail.com
+
+GNU General Public License v3 (GNU GPLv3)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 2017-04-12 Trey V. Wenger
 2018-02-10 Trey V. Wenger added correct_vlsr
 2019-01-18 Trey V. Wenger removed pool_wait
                           added function to compute Anderson+2012
                           kinematic distance uncertainties
+2020-02-19 Trey V. Wenger updates for v2.0
 """
 
 import os
-import time
 import numpy as np
 from scipy.io import readsav
+from scipy.stats.kde import gaussian_kde
+from pyqt_fit import kde as pyqt_kde
+from pyqt_fit import kde_methods
 
-def calc_Rgal(glong, dist, R0=8.34):
+# IAU-defined solar motion parameters (km/s)
+__Ustd = 10.27
+__Vstd = 15.32
+__Wstd = 7.74
+
+# Reid+2019 Galactocentric radius and solar motion parameters
+__R0 = 8.15 # kpc
+__Usun = 10.6 # km/s
+__Vsun = 10.7 # km/s
+__Wsun = 7.6 # km/s
+
+def calc_Rgal(glong, dist, R0=__R0):
     """
     Return the Galactocentric radius of an object with a given
     Galacitic longitude and distance.
 
     Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as dist.
-      dist : scalar or 1-D array
-             line-of-sight distance (kpc). If it is an array, it
-             must have the same size as glong.
-      R0 : scalar (optional)
-           Galactocentric radius of the Sun.
+      glong :: scalar or array of scalars
+        Galactic longitude (deg).
+
+      dist :: scalar or array of scalars
+        line-of-sight distance (kpc).
+
+      R0 :: scalar (optional)
+        Galactocentric radius of the Sun.
 
     Returns: R
-      Rgal : scalar or 1-D array
-             Galactocentric radius (kpc). If glong and dist are
-             scalars, it is a scalar. Otherwise, it has shape
-             (dist.size).
-
-    Raises:
-      ValueError : if glong or dist are not 1-D; or
-                   if glong and dist are arrays and not the same size
+      Rgal :: scalar or array of scalars
+        Galactocentric radius (kpc).
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    glong_inp, dist_inp = np.atleast_1d(glong, dist)
-    # check shape of inputs
-    if glong_inp.ndim != 1 or dist_inp.ndim != 1:
-        raise ValueError("glong and dist must be 1-D")
-    if glong_inp.size != 1 and glong_inp.size != dist_inp.size:
-        raise ValueError("glong and dist must have same size")
     #
     # law of cosines
     #
-    Rgal2 = R0**2. + dist_inp**2.
-    Rgal2 = Rgal2 - 2.*R0*dist_inp*np.cos(np.deg2rad(glong_inp))
+    Rgal2 = R0**2. + dist**2.
+    Rgal2 = Rgal2 - 2.*R0*dist*np.cos(np.deg2rad(glong))
     Rgal = np.sqrt(Rgal2)
-    #
-    # Convert back to scalar if necessary
-    #
-    if dist_inp.size == 1:
-        return Rgal[0]
-    else:
-        return Rgal
+    return Rgal
 
-def calc_az(glong, dist, R0=8.34):
+def calc_az(glong, dist, R0=__R0):
     """
     Return the Galactocentric azimuth of an object with a given
     Galacitic longitude and distance. Galactocentric azimuth is
@@ -73,46 +83,30 @@ def calc_az(glong, dist, R0=8.34):
     in the direction of the Solar orbit direction.
 
     Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as dist.
-      dist : scalar or 1-D array
-             line-of-sight distance (kpc). If it is an array, it
-             must have the same size as glong.
-      R0 : scalar (optional)
-           Galactocentric radius of the Sun.
+      glong :: scalar or array of scalars
+        Galactic longitude (deg).
+
+      dist :: scalar or array of scalars
+        line-of-sight distance (kpc).
+
+      R0 :: scalar (optional)
+        Galactocentric radius of the Sun.
 
     Returns: az
-      az : scalar or 1-D array
-           Galactocentric azimuth (degs). If glong and dist are
-           scalars, it is a scalar. Otherwise, it has shape
-           (dist.size).
-
-    Raises:
-      ValueError : if glong or dist are not 1-D; or
-                   if glong and dist are arrays and not the same size
+      az :: scalar or array of scalars
+        Galactocentric azimuth (degs).
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    glong_inp, dist_inp = np.atleast_1d(glong, dist)
-    # check shape of inputs
-    if glong_inp.ndim != 1 or dist_inp.ndim != 1:
-        raise ValueError("glong and dist must be 1-D")
-    if glong_inp.size != 1 and glong_inp.size != dist_inp.size:
-        raise ValueError("glong and dist must have same size")
-    # ensure range [0,360) degrees
-    fix_glong = glong_inp % 360.
+    # ensure longitude range [0,360) degrees
+    glong = glong % 360.
     #
     # Compute Rgal
     #
-    Rgal = calc_Rgal(fix_glong,dist_inp,R0=R0)
-    Rgal_inp = np.atleast_1d(Rgal)
+    Rgal = calc_Rgal(glong, dist, R0=R0)
     #
     # law of cosines
     #
-    cos_az = (R0**2. + Rgal_inp**2. - dist_inp**2.)/(2.*Rgal_inp*R0)
+    cos_az = (R0**2. + Rgal**2. - dist**2.)/(2.*Rgal*R0)
+    cos_az = np.atleast_1d(cos_az)
     #
     # Catch fringe cases
     #
@@ -122,65 +116,45 @@ def calc_az(glong, dist, R0=8.34):
     #
     # Correct azimuth in 3rd and 4th quadrants
     #
-    az[fix_glong > 180.] = 360. - az[fix_glong > 180.]
-    #
-    # Convert back to scalar if necessary
-    #
-    if dist_inp.size == 1:
-        return az[0]
+    glong = np.atleast_1d(glong)
+    if glong.size == az.size:
+        az[glong > 180.] = 360. - az[glong > 180.]
+    elif glong.size == 1 and glong[0] > 180:
+        az = 360. - az
     else:
-        return az
+        raise ValueError("Shape mismatch glong and az")
+    if az.size == 1:
+        return az[0]
+    return az
 
-def calc_dist(az, Rgal, R0=8.34):
+def calc_dist(az, Rgal, R0=__R0):
     """
     Return the line-of-sight distance of an object with a given
-    Galacitocentric azimuth and radius.
+    Galactocentric azimuth and radius.
 
     Parameters:
-      az : scalar or 1-D array
-           Galactocentric azimuth (deg). If it is an array, it must
-           have the same size as dist.
-      Rgal : scalar or 1-D array
-             Galactocentric radius (kpc). If it is an array, it
-             must have the same size as glong.
-      R0 : scalar (optional)
-           Galactocentric radius of the Sun.
+      az :: scalar or array of scalars
+        Galactocentric azimuth (deg).
+
+      Rgal :: scalar or array of scalars
+        Galactocentric radius (kpc).
+
+      R0 :: scalar (optional)
+        Galactocentric radius of the Sun.
 
     Returns: dist
-      dist : scalar or 1-D array
-             Line-of-sight distance (kpc). If az and Rgal are
-             scalars, it is a scalar. Otherwise, it has shape
-             (Rgal.size).
-
-    Raises:
-      ValueError : if az or Rgal are not 1-D; or
-                   if az and Rgal are arrays and not the same size
+      dist :: scalar or array of scalars
+        Line-of-sight distance (kpc).
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    az_inp, Rgal_inp = np.atleast_1d(az, Rgal)
-    # check shape of inputs
-    if az_inp.ndim != 1 or Rgal_inp.ndim != 1:
-        raise ValueError("az and Rgal must be 1-D")
-    if az_inp.size != 1 and az_inp.size != Rgal_inp.size:
-        raise ValueError("az and Rgal must have same size")
     #
     # law of cosines
     #
-    dist2 = R0**2. +Rgal_inp**2.
-    dist2 = dist2 - 2.*R0*Rgal_inp*np.cos(np.deg2rad(az_inp))
+    dist2 = R0**2. +Rgal**2.
+    dist2 = dist2 - 2.*R0*Rgal*np.cos(np.deg2rad(az))
     dist = np.sqrt(dist2)
-    #
-    # Convert back to scalar if necessary
-    #
-    if Rgal_inp.size == 1:
-        return dist[0]
-    else:
-        return dist
+    return dist
 
-def calc_glong(az, Rgal, R0=8.34):
+def calc_glong(az, Rgal, R0=__R0):
     """
     Return the Galactic longitude of an object with a given
     Galacitocentric azimuth and radius. Galactic longitude is
@@ -188,46 +162,30 @@ def calc_glong(az, Rgal, R0=8.34):
     increasing in the direction of the Solar orbit direction.
 
     Parameters:
-      az : scalar or 1-D array
-           Galactocentric azimuth (deg). If it is an array, it must
-           have the same size as dist.
-      Rgal : scalar or 1-D array
-             Galactocentric radius (kpc). If it is an array, it
-             must have the same size as glong.
-      R0 : scalar (optional)
-           Galactocentric radius of the Sun.
+      az :: scalar or array of scalars
+        Galactocentric azimuth (deg).
+
+      Rgal :: scalar or array of scalars
+        Galactocentric radius (kpc).
+
+      R0 :: scalar (optional)
+        Galactocentric radius of the Sun.
 
     Returns: glong
-      glong : scalar or 1-D array
-              Galactic longitude (degs). If az and Rgal are
-              scalars, it is a scalar. Otherwise, it has shape
-              (Rgal.size).
-
-    Raises:
-      ValueError : if az or Rgal are not 1-D; or
-                   if az and Rgal are arrays and not the same size
+      glong :: scalar or array of scalars
+        Galactic longitude (degs).
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    az_inp, Rgal_inp = np.atleast_1d(az, Rgal)
-    # check shape of inputs
-    if az_inp.ndim != 1 or Rgal_inp.ndim != 1:
-        raise ValueError("az and Rgal must be 1-D")
-    if az_inp.size != 1 and az_inp.size != Rgal_inp.size:
-        raise ValueError("az and Rgal must have same size")
-    # ensure range [0,360) degrees
-    fix_az = az_inp % 360.
+    # ensure azimuth range [0,360) degrees
+    az = az % 360.
     #
     # Compute line of sight distance
     #
-    dist = calc_dist(fix_az,Rgal_inp,R0=R0)
-    dist_inp = np.atleast_1d(dist)
+    dist = calc_dist(az, Rgal, R0=R0)
     #
     # law of cosines
     #
-    cos_glong = (R0**2. + dist_inp**2. - Rgal_inp**2.)/(2.*dist_inp*R0)
+    cos_glong = (R0**2. + dist**2. - Rgal**2.)/(2.*dist*R0)
+    cos_glong = np.atleast_1d(cos_glong)
     #
     # Catch fringe cases
     #
@@ -237,83 +195,51 @@ def calc_glong(az, Rgal, R0=8.34):
     #
     # Correct longitude in 3rd and 4th quadrants
     #
-    glong[fix_az > 180.] = 360. - glong[fix_az > 180.]
-    #
-    # Convert back to scalar if necessary
-    #
-    if Rgal_inp.size == 1:
-        return glong[0]
+    az = np.atleast_1d(az)
+    if az.size == glong.size:
+        glong[az > 180.] = 360. - glong[az > 180.]
+    elif az.size == 1 and az[0] > 180:
+        glong = 360. - glong
     else:
-        return glong
+        raise ValueError("Shape mismatch glong and az")
+    if glong.size == 1:
+        return glong[0]
+    return glong
 
-def correct_vlsr(glong, glat, vlsr, e_vlsr,
-                 Ustd=10.27, Vstd=15.32, Wstd=7.74,
-                 Usun=10.5, e_Usun=1.7, Vsun=14.4, e_Vsun=6.8,
-                 Wsun=8.9, e_Wsun=0.9):
+def correct_vlsr(glong, glat, vlsr,
+                 Ustd=__Ustd, Vstd=__Vstd, Wstd=__Wstd,
+                 Usun=__Usun, Vsun=__Vsun, Wsun=__Wsun):
     """
     Return the "corrected" LSR velocity by updating the IAU-defined
-    solar motion components (Ustd,Vstd,Wstd) to newly-measured
-    values (Usun,Vsun,Wsun).
-    Also computes the new LSR velocity uncertainty including the
-    uncertainties in the newly-measured values (e_Usun,e_Vsun,e_Wsun). 
+    solar motion components.
 
     Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as glat, vlsr, and e_vlsr.
-      glat : scalar or 1-D array
-             Galactic latitude (deg). If it is an array, it
-             must have the same size as glong, vlsr, and e_vlsr.
-      vlsr : scalar or 1-D array
-             Measured LSR velocity (km/s). If it is an array, it
-             must have the same size as glong, glat, and e_vlsr.
-      e_vlsr : scalar or 1-D array
-               Uncertainty on measured LSR velocity (km/s). If it is 
-               an array, it must have the same size as glong, glat, 
-               and vlsr.
-      Ustd,Vstd,Wstd : scalar (optional)
-                       IAU-defined solar motion parameters (km/s).
-      Usun,Vsun,Wsun : scalar (optional)
-                       Newly measured solar motion parameters (km/s).
-                       Defaults are from Reid et al. (2014)
-      e_Usun,e_Vsun,e_Wsun : scalar (optional)
-                       Newly measured solar motion parameter
-                       uncertainties (km/s).
-                       Defaults are from Reid et al. (2014)
+      glong :: scalar or array of scalars
+        Galactic longitude (deg).
 
-    Returns: (new_vlsr,e_new_vlsr)
-      new_vlsr : scalar or 1-D array
-                 Re-computed LSR velocity. Same shape as vlsr.
-      e_vlsr : scalar or 1-D array
-               Re-computed LSR velocity uncertainty. Same shape as 
-               e_vlsr.
+      glat :: scalar or array of scalars
+        Galactic latitude (deg).
 
-    Raises:
-      ValueError : if glong, glat, vlsr, and e_vlsr are not 1-D; or
-                   if glong, glat, vlsr, and e_vlsr are arrays and 
-                   not the same size
+      vlsr :: scalar or array of scalars
+             Measured LSR velocity (km/s).
+
+      Ustd, Vstd, Wstd :: scalars (optional)
+        IAU-defined solar motion parameters (km/s).
+
+      Usun, Vsun, Wsun : scalars (optional)
+        Updated solar motion parameters (km/s).
+
+    Returns: corr_vlsr
+      corr_vlsr :: scalar or array of scalars
+        Corrected LSR velocity
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    glong_inp, glat_inp, vlsr_inp, e_vlsr_inp = \
-      np.atleast_1d(glong, glat, vlsr, e_vlsr)
-    # check shape of inputs
-    if (glong_inp.ndim != 1 or glat_inp.ndim != 1 or
-        vlsr_inp.ndim != 1 or e_vlsr_inp.ndim != 1):
-        raise ValueError("glong, glat, vlsr, and e_vlsr must be 1-D")
-    if glong_inp.size != 1 and (glong_inp.size != glat_inp.size or
-                                glong_inp.size != vlsr_inp.size or
-                                glong_inp.size != e_vlsr_inp.size):
-        raise ValueError("glong, glat, vlsr, and e_vlsr must have same size")
     #
     # Useful values
     #
-    cos_glong = np.cos(np.deg2rad(glong_inp))
-    sin_glong = np.sin(np.deg2rad(glong_inp))
-    cos_glat = np.cos(np.deg2rad(glat_inp))
-    sin_glat = np.sin(np.deg2rad(glat_inp))
+    cos_glong = np.cos(np.deg2rad(glong))
+    sin_glong = np.sin(np.deg2rad(glong))
+    cos_glat = np.cos(np.deg2rad(glat))
+    sin_glat = np.sin(np.deg2rad(glat))
     #
     # Compute heliocentric velocity by subtracting IAU defined solar
     # motion components
@@ -322,7 +248,7 @@ def correct_vlsr(glong, glat, vlsr, e_vlsr,
     V_part = Vstd*sin_glong
     W_part = Wstd*sin_glat
     UV_part = (U_part+V_part)*cos_glat
-    v_helio = vlsr_inp - UV_part - W_part
+    v_helio = vlsr - UV_part - W_part
     #
     # Compute corrected VLSR
     #
@@ -330,57 +256,38 @@ def correct_vlsr(glong, glat, vlsr, e_vlsr,
     V_part = Vsun*sin_glong
     W_part = Wsun*sin_glat
     UV_part = (U_part+V_part)*cos_glat
-    new_vlsr = v_helio + UV_part + W_part
-    #
-    # Compute corrected LSR velocity uncertainty
-    #
-    U_part = (e_Usun*cos_glong*cos_glat)**2.
-    V_part = (e_Vsun*sin_glong*cos_glat)**2.
-    W_part = (e_Wsun*sin_glat)**2.
-    e_new_vlsr = np.sqrt(e_vlsr_inp**2.+U_part+V_part+W_part)
-    #
-    # Convert back to scalar if necessary
-    #
-    if glong_inp.size == 1:
-        return new_vlsr[0],e_new_vlsr[0]
-    else:
-        return new_vlsr,e_new_vlsr
+    corr_vlsr = v_helio + UV_part + W_part
+    return corr_vlsr
 
 def calc_anderson2012_uncertainty(glong, vlsr):
     """
     Return the Anderson+2012 kinematic distance uncertainties.
 
     Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as vlsr
-      vlsr : scalar or 1-D array
-             Measured LSR velocity (km/s). If it is an array, it
-             must have the same size as glong, glat, and e_vlsr.
+      glong :: scalar or array of scalars
+        Galactic longitude (deg).
 
-    Returns: (near_err, far_err, tangent_err)
-      near_err : scalar or 1-D array
-                 Anderson+2012 near distance uncertainty
-      far_err : scalar or 1-D array
-                Anderson+2012 tangent distance uncertainty
-      tangent_err : scalar or 1-D array
-                    Anderson+2012 far distance uncertainty
+      vlsr :: scalar or array of scalars
+        Measured LSR velocity (km/s).
+
+    Returns: near_err, far_err, tangent_err
+      near_err :: scalar or array of scalars
+        Anderson+2012 near distance uncertainty
+
+      far_err :: scalar or array of scalars
+        Anderson+2012 far distance uncertainty
+
+      tangent_err :: scalar or array of scalars
+        Anderson+2012 tangent distance uncertainty
 
     Raises:
       ValueError : if glong and vlsr are not 1-D; or
                    if glong and vlsr are arrays and 
                    not the same size
     """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    glong_inp, vlsr_inp =  np.atleast_1d(glong, vlsr)
-    # check shape of inputs
-    if (glong_inp.ndim != 1 or vlsr_inp.ndim != 1):
-        raise ValueError("glong and vlsr must be 1-D")
-    if glong_inp.size != 1 and glong_inp.size != vlsr_inp.size:
-        raise ValueError("glong and vlsr must have same size")
+    glong, vlsr = np.atleast_1d(glong, vlsr)
+    if np.shape(glong) != np.shape(vlsr):
+        raise ValueError("glong and vlsr must have same shape")
     #
     # Read Anderson+2012 uncertainty data
     #
@@ -395,19 +302,102 @@ def calc_anderson2012_uncertainty(glong, vlsr):
     # find matching longitudes and velocities
     #
     best_glong = np.array([np.nanargmin(np.abs(gl-a12_glongs))
-                           for gl in glong_inp])
+                           for gl in glong])
     best_vlsr = np.array([np.nanargmin(np.abs(vl-a12_vlsrs))
-                          for vl in vlsr_inp])
+                          for vl in vlsr])
     #
     # Get distance uncertainties
     #
-    near_err = np.array(a12_near_err[best_glong,best_vlsr])
-    far_err = np.array(a12_far_err[best_glong,best_vlsr])
-    tangent_err = np.nanmax(np.vstack((near_err,far_err)),axis=0)
+    near_err = a12_near_err[best_glong, best_vlsr]
+    far_err = a12_far_err[best_glong, best_vlsr]
+    tangent_err = np.nanmax(np.vstack((near_err, far_err)),axis=0)
+    if glong.size == 1:
+        return (near_err[0], far_err[0], tangent_err[0])
+    return (near_err, far_err, tangent_err)
+
+def calc_hpd(samples, kdetype, alpha=0.683, pdf_bins=1000):
+    """
+    Fit a kernel density estimator (KDE) to the posterior given
+    by a collection of samples. Return the mode (posterior peak)
+    and the highest posterior density (HPD) determined by the minimum
+    width Bayesian credible interval (BCI) containing a fraction of
+    the posterior samples. The posterior should be well described by a
+    single-modal distribution.
+
+    Parameters:
+      samples :: 1-D array of scalars
+        The samples being fit with a KDE
+
+      kdetype :: string
+        Which KDE method to use
+          'pyqt' uses pyqt_fit with boundary at 0
+          'scipy' uses gaussian_kde with no boundary
+
+      alpha :: scalar (optional)
+        The fraction of samples included in the BCI.
+
+      pdf_bins :: integer (optional)
+        Number of bins used in calculating the PDF
+
+    Returns: kde, mode, lower, upper
+      kde :: scipy.gaussian_kde or pyqt_fit.1DKDE object
+        The KDE calculated for this kinematic distance
+
+      mode :: scalar
+        The mode of the posterior
+
+      lower :: scalar
+        The lower bound of the BCI
+
+      upper :: scalar
+        The upper bound of the BCI
+    """
+    # check inputs
+    if (alpha <= 0.) or (alpha >= 1.):
+        raise ValueError("alpha should be between 0 and 1.")
     #
-    # Convert back to scalar if necessary
+    # Fit KDE
     #
-    if glong_inp.size == 1:
-        return near_err[0],far_err[0],tangent_err[0]
-    else:
-        return near_err,far_err,tangent_err
+    nans = np.isnan(samples)
+    if np.sum(~nans) < 2:
+        # skip if fewer than two non-nans
+        return (None, np.nan, np.nan, np.nan)
+    try:
+        if kdetype == 'scipy':
+            kde = gaussian_kde(samples[~nans])
+        elif kdetype == 'pyqt':
+            kde = pyqt_kde.KDE1D(
+                samples[~nans], lower=0,
+                method=kde_methods.linear_combination)
+        else:
+            raise ValueError("Invalid KDE method: {0}".format(kdetype))
+    except np.linalg.LinAlgError:
+        # catch singular matricies (i.e. all values are the same)
+        return (None, np.nan, np.nan, np.nan)
+    #
+    # Compute PDF
+    #
+    xdata = np.linspace(
+        np.nanmin(samples), np.nanmax(samples), pdf_bins)
+    pdf = kde(xdata)
+    #
+    # Get the location of the mode
+    #
+    mode = xdata[np.argmax(pdf)]
+    if np.isnan(mode):
+        return (None, np.nan, np.nan, np.nan)
+    #
+    # Reverse sort the PDF and xdata and find the BCI
+    #
+    sort_pdf = sorted(
+        zip(xdata, pdf/np.sum(pdf)), key=lambda x: x[1], reverse=True)
+    cum_prob = 0.
+    bci_xdata = np.empty(len(xdata), dtype=float)*np.nan
+    for i, dat in enumerate(sort_pdf):
+        cum_prob += dat[1]
+        bci_xdata[i] = dat[0]
+        if cum_prob >= alpha:
+            break
+    lower = np.nanmin(bci_xdata)
+    upper = np.nanmax(bci_xdata)
+    return kde, mode, lower, upper

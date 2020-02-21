@@ -5,7 +5,26 @@ rotcurve_kd.py
 Utilities to calculate kinematic distances using the traditional
 rotation curve methods.
 
+Copyright(C) 2017-2020 by
+Trey V. Wenger; tvwenger@gmail.com
+
+GNU General Public License v3 (GNU GPLv3)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 2017-04-12 Trey V. Wenger
+2020-02-20 Trey V. Wener updates for v2.0
 """
 
 import importlib
@@ -13,165 +32,201 @@ import numpy as np
 
 from kd import kd_utils
 
-def rotcurve_kd(glong,velo,velo_tol=1.e-1,
-                rotcurve='reid14_rotcurve',
-                dist_res=1.e-2,dist_min=0.01,dist_max=30.,
-                resample=False):
+def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
+                rotcurve='reid19_rotcurve',
+                dist_res=0.001, dist_min=0.001, dist_max=30.,
+                resample=False, size=1):
     """
     Return the kinematic near, far, and tanget distance for a
     given Galactic longitude and LSR velocity assuming
     a given rotation curve.
 
     Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as velo.
-      velo : scalar or 1-D array
-             LSR velocity (km/s). If it is an array, it must
-             have the same size as glong.
-      velo_tol : scalar (optional)
-                 LSR velocity tolerance to consider a match between
-                 velo and rotation curve velocity
-      rotcurve : string (optional)
-                 rotation curve model
-      dist_res : scalar (optional)
-                 line-of-sight distance resolution when calculating
-                 kinematic distance (kpc)
-      dist_min : scalar (optional)
-                 minimum line-of-sight distance when calculating
-                 kinematic distance (kpc)
-      dist_max : scalar (optional)
-                 maximum line-of-sight distance when calculating
-                 kinematic distance (kpc)
-      resample : bool (optional)
-                 if True, resample rotation curve parameters within
-                 uncertainties
+      glong :: scalar or array of scalars
+        Galactic longitude (deg). If it is an array, it must have the
+        same shape as velo.
+
+      velo :: scalar or array of scalars
+        LSR velocity (km/s). If it is an array, it must have the same
+        shape as glong.
+
+      velo_err :: scalar or array of scalars (optional)
+        LSR velocity uncertainty (km/s). If it is an array, it must
+        have the same shape as velo. Otherwise, this scalar 
+        uncertainty is applied to all velos.
+
+      velo_tol :: scalar (optional)
+        LSR velocity tolerance to consider a match between velo and
+        rotation curve velocity
+
+      rotcurve :: string (optional)
+        rotation curve model
+
+      dist_res :: scalar (optional)
+        line-of-sight distance resolution when calculating kinematic
+        distance (kpc)
+
+      dist_min :: scalar (optional)
+        minimum line-of-sight distance when calculating kinematic
+        distance (kpc)
+
+      dist_max :: scalar (optional)
+        maximum line-of-sight distance when calculating kinematic
+        distance (kpc)
+
+      resample :: bool (optional)
+        if True, use resampled rotation curve parameters and LSR 
+        velocities.
+
+      size :: integer (optional)
+        if resample is True, generate this many samples
     
     Returns: output
-      output["Rgal"] : scalar or 1-D array
-                       Galactocentric radius (kpc).
-      output["Rtan"] : scalar or 1-D array
-                       Galactocentric radius of tangent point (kpc).
-      output["near"] : scalar or 1-D array
-                       kinematic near distance (kpc)
-      output["far"] : scalar or 1-D array
-                      kinematic far distance (kpc)
-      output["tangent"] : scalar or 1-D array
-                          kinematic tangent distance (kpc)
-      output["vlsr_tangent"] : scalar or 1-D array
-                               LSR velocity of tangent point (km/s)
+      output["Rgal"] :: scalar or array of scalars
+        Galactocentric radius (kpc).
+
+      output["Rtan"] :: scalar or array of scalars
+        Galactocentric radius of tangent point (kpc).
+
+      output["near"] :: scalar or array of scalars
+        kinematic near distance (kpc)
+
+      output["far"] :: scalar or array of scalars
+        kinematic far distance (kpc)
+
+      output["tangent"] :: scalar or array of scalars
+        kinematic tangent distance (kpc)
+
+      output["vlsr_tangent"] :: scalar or array of scalars
+        LSR velocity of tangent point (km/s)
+
       If glong and velo are scalars, each of these is a scalar.
-      Otherwise they have shape (velo.size).
+      Otherwise they have the same shape as input glong and velo.
+
+      If resample is True and size > 1, the samples are stored along
+      the last axis of each element.
 
     Raises:
-      ValueError : if glong and velo are not 1-D; or
-                   if glong and velo are arrays and not the same size
+      ValueError : if glong and velo are not the same shape
     """
     #
     # check inputs
     #
     # convert scalar to array if necessary
-    glong_inp, velo_inp = np.atleast_1d(glong, velo)
+    glong, velo = np.atleast_1d(glong, velo)
+    inp_shape = glong.shape
+    glong = glong.flatten()
+    velo = velo.flatten()
     # check shape of inputs
-    if glong_inp.ndim != 1 or velo_inp.ndim != 1:
-        raise ValueError("glong and velo must be 1-D")
-    if glong_inp.size != velo_inp.size:
-        raise ValueError("glong and velo must be same size")
+    if glong.shape != velo.shape:
+        raise ValueError("glong and velo must have same shape")
+    if (velo_err is not None and not np.isscalar(velo_err)):
+        velo_err = velo_err.flatten()
+        if velo_err.shape != velo.shape:
+            raise ValueError("velo_err must be scalar or have same shape as velo")
+    #
+    # Default velo_err to 0, sample size to 1
+    #
+    elif velo_err is None:
+        velo_err = 0.
+    if not resample:
+        size = 1
+    if size < 1:
+        raise ValueError("size must be >= 1")
     # ensure range [0,360) degrees
-    fix_glong = glong_inp % 360.
+    glong = glong % 360.
     #
-    # Create array of distances
-    #
-    dists = np.arange(dist_min,dist_max,dist_res)   
-    #
-    # Calculate LSR velocity at each (glong,distance) point using
-    # rotation curve
+    # import rotation curve
     #
     rotcurve_module = importlib.import_module('kd.'+rotcurve)
-    vlsrs = np.zeros((fix_glong.size,dists.size))
-    params = [None]*fix_glong.size
-    for ind,l in enumerate(fix_glong):
-        vlsr,param = \
-          rotcurve_module.calc_vlsr(l,dists,resample=resample)
-        vlsrs[ind] = vlsr
-        params[ind] = param
     #
-    # Storage for kinematic distance indicies
+    # Create array of distances, then grid of (dists, glongs)
     #
-    near_ind = np.ma.masked_all(velo_inp.size,dtype=np.int)
-    far_ind = np.ma.masked_all(velo_inp.size,dtype=np.int)
-    tan_ind = np.ma.masked_all(fix_glong.size,dtype=np.int)
+    dists = np.arange(dist_min, dist_max+dist_res, dist_res)
+    dist_grid, glong_grid = np.meshgrid(dists, glong, indexing='ij')
     #
-    # Find kinematic distance indicies
+    # Storage for results
     #
-    for i,(l,v) in enumerate(zip(fix_glong,velo_inp)):
+    tan_idx_samples = np.ones((len(glong), size), dtype=int)*-1
+    near_idx_samples = np.ones((len(glong), size), dtype=int)*-1
+    far_idx_samples = np.ones((len(glong), size), dtype=int)*-1
+    vlsr_tan_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    #
+    # Get nominal parameters
+    #
+    params = rotcurve_module.nominal_params()
+    velo_sample = np.copy(velo)
+    for snum in range(size):
         #
-        # 2nd or 3rd quadrants
+        # Resample velocity and rotation curve parameters
         #
-        if (90. <= l <= 270.):
-            #
-            # far distance indicies
-            #
-            velo_diff = np.min(np.abs(vlsrs[i] - v))
-            best_ind = np.argmin(np.abs(vlsrs[i] - v))
-            if velo_diff < velo_tol:
-                far_ind[i] = best_ind
+        if resample:
+            params = rotcurve_module.resample_params(size=glong.size)
+            velo_sample = np.random.normal(loc=velo, scale=velo_err)
         #
-        # 1st or 4th quadrants
+        # Calculate LSR velocity at each (glong, distance) point
         #
-        else:
-            #
-            # tangent distance indicies
-            #
-            if l <= 90.: tan_ind[i] = np.argmax(vlsrs[i])
-            if l >= 270.: tan_ind[i] = np.argmin(vlsrs[i])
-            # mask if tangent distance is zero
-            if tan_ind[i] == 0:
-                tan_ind.mask[i] = True
-                continue
-            #
-            # near distance indicies
-            #
-            velo_diff = np.min(np.abs(vlsrs[i,0:tan_ind[i]]-v))
-            best_ind = np.argmin(np.abs(vlsrs[i,0:tan_ind[i]]-v))
-            if velo_diff < velo_tol:
-                near_ind[i] = best_ind
-            #
-            # far distance indicies
-            #
-            velo_diff = np.min(np.abs(vlsrs[i,tan_ind[i]:]-v))
-            best_ind = np.argmin(np.abs(vlsrs[i,tan_ind[i]:]-v))
-            best_ind += tan_ind[i]
-            if velo_diff < velo_tol:
-                far_ind[i] = best_ind
+        grid_vlsrs = rotcurve_module.calc_vlsr(
+            glong_grid, dist_grid, **params)
+        #
+        # Get index of tangent point along each direction
+        #
+        tan_idxs = np.array([
+            np.argmax(vlsr) if l < 90. else np.argmin(vlsr) if l > 270.
+            else -1 for l, vlsr in zip(glong, grid_vlsrs.T)])
+        #
+        # Get index of near and far distances along each direction
+        #
+        near_idxs = np.array([
+            np.argmin(np.abs(vlsr[:tan_idx]-v)) if
+            (tan_idx != -1 and np.min(np.abs(vlsr[:tan_idx]-v)) < velo_tol)
+            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
+        far_idxs = np.array([
+            tan_idx+np.argmin(np.abs(vlsr[tan_idx:]-v)) if
+            (tan_idx != -1 and np.min(np.abs(vlsr[tan_idx:]-v)) < velo_tol)
+            else np.argmin(np.abs(vlsr-v)) if
+            (tan_idx == -1 and np.min(np.abs(vlsr-v)) < velo_tol)
+            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
+        #
+        # Get VLSR of tangent point
+        #
+        vlsr_tan = np.array([
+            vlsr[tan_idx] if tan_idx != -1 else np.nan
+            for vlsr, tan_idx in zip(grid_vlsrs.T, tan_idxs)])
+        #
+        # Save
+        #
+        tan_idx_samples[:, snum] = tan_idxs
+        near_idx_samples[:, snum] = near_idxs
+        far_idx_samples[:, snum] = far_idxs
+        vlsr_tan_samples[:, snum] = vlsr_tan
     #
-    # Assign distances from indicies, mask where appropriate
+    # Assign distances from indicies
     #
-    near_dist = np.array([dists[ind] if ind is not np.ma.masked
-                          else np.nan for ind in near_ind])
-    far_dist = np.array([dists[ind] if ind is not np.ma.masked
-                         else np.nan for ind in far_ind])
-    Rgal = np.array([kd_utils.calc_Rgal(l,d,R0=params[ind]["R0"])
-                     for ind,(l,d) in
-                     enumerate(zip(fix_glong,far_dist))])
-    tan_dist = np.array([dists[ind] if ind is not np.ma.masked
-                         else np.nan for ind in tan_ind])
-    Rtan = np.array([kd_utils.calc_Rgal(l,d,R0=params[ind]["R0"])
-                     for ind,(l,d) in
-                     enumerate(zip(fix_glong,tan_dist))])
-    #
-    # Assign tangent point velocities
-    #
-    vlsr_tan = np.array([vlsrs[i][t] if t is not np.ma.masked
-                         else np.nan for i,t in enumerate(tan_ind)])
+    tan_dist = dists[tan_idx_samples]
+    tan_dist[tan_idx_samples == -1] = np.nan
+    near_dist = dists[near_idx_samples]
+    near_dist[near_idx_samples == -1] = np.nan
+    far_dist = dists[far_idx_samples]
+    far_dist[far_idx_samples == -1] = np.nan
+    Rgal = kd_utils.calc_Rgal(glong, far_dist.T, R0=params['R0']).T
+    Rtan = kd_utils.calc_Rgal(glong, tan_dist.T, R0=params['R0']).T
     #
     # Convert back to scalars if necessary
     #
-    if len(fix_glong) == 1:
-        return {"Rgal":Rgal[0], "Rtan":Rtan[0], "near":near_dist[0],
-                "far":far_dist[0], "tangent":tan_dist[0],
-                "vlsr_tangent":vlsr_tan[0]}
+    output = {"Rgal": Rgal, "Rtan": Rtan, "near": near_dist,
+              "far": far_dist, "tangent": tan_dist,
+              "vlsr_tangent": vlsr_tan_samples}
+    if size == 1:
+        for key in output:
+            output[key] = np.squeeze(output[key], axis=-1)
+    if glong.size == 1:
+        for key in output:
+            output[key] = output[key][0]
     else:
-        return {"Rgal":Rgal, "Rtan":Rtan, "near":near_dist,
-                "far":far_dist, "tangent":tan_dist,
-                "vlsr_tangent":vlsr_tan}
+        for key in output:
+            if size == 1:
+                output[key] = output[key].reshape(inp_shape)
+            else:
+                output[key] = output[key].reshape(inp_shape+(size,))
+    return output

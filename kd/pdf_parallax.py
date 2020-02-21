@@ -4,352 +4,211 @@ pdf_parallax.py
 
 Utility to calculate PDF parallax distances.
 
+Copyright(C) 2017-2020 by
+Trey V. Wenger; tvwenger@gmail.com
+
+GNU General Public License v3 (GNU GPLv3)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 2019-01-19 Trey V. Wenger
+2020-02-20 Trey V. Wener updates for v2.0
 """
 
-import time
-
 import numpy as np
-from scipy.stats.kde import gaussian_kde
-
 import matplotlib.pyplot as plt
 
-from scipy import integrate
-from pyqt_fit import kde as pyqt_kde
-from pyqt_fit import kde_methods
-
 from kd.parallax import parallax
+from kd.kd_utils import calc_hpd
 
-def parallax_worker(num_samples, glong, plx, plx_err=None,
-                    dist_max=30., R0=8.34):
+# Solar Galactocentric radius and error from Reid+2019
+__R0 = 8.15 # kpc
+__R0_err = 0.15 # kpc
+
+def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
+                 R0_err=__R0_err, pdf_bins=100, num_samples=1000,
+                 plot_pdf=False, plot_prefix='pdf_'):
     """
-    Resamples parallax and computes distance and Galactocentric
-    radius.
-    
+    Return the parallax Galactocentric radius and distance given a
+    parallax and parallax uncertainty. Generate distance posterior by
+    resampling parallax and R0 within uncertainties. Peak of posterior
+    and 68.3% minimum width Bayesian credible interval (BCI) are
+    returned.
+
     Parameters:
-      num_samples : integer
-                    number of samples
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as plx.
-      plx : scalar or 1-D array
-            Parallax (milli-arcseconds). If it is an array, it must
-            have the same size as glong.
-      plx_err : scalar or 1-D
-                Parallax uncertainty (milli-arcseconds). If it is
-                an array, it must have the same size as plx.
-      dist_max : scalar (optional)
-                 The maximum parallax distance to compute (kpc)
-      R0 : scalar (optional)
-           Solar Galactocentric radius (kpc)
-    
+      glong :: scalar or array of scalars
+        Galactic longitude (deg).
+
+      plx :: scalar or array of scalars
+        Parallax in milli-arcseconds
+
+      plx_err :: scalar or 1-D (optional)
+        Parallax uncertainty in milli-arcseconds. If it is an array,
+        it must have the same size as plx. Otherwise, this scalar
+        uncertainty is applied to all plxs.
+
+      dist_max :: scalar (optional)
+        The maximum parallax distance to compute (kpc)
+
+      R0, R0_err :: scalar (optional)
+        Solar Galactocentric radius and uncertainty (kpc)
+
+      pdf_bins :: integer (optional)
+        number of bins used to calculate PDF
+
+      num_samples :: integer (optional)
+        Number of MC samples to use when generating PDF
+
+      plot_pdf :: bool (optional)
+        If True, plot each PDF. Filenames are
+        plot_prefix+"{plx}_{err}.pdf".
+
+      plot_prefix :: string (optional)
+        The prefix for the plot filenames.
+
     Returns: output
-      output : list of parallax output for each (glong, plx).
-               For example, output[0]["distance"] contains the 1-D
-               array of parallax distances calculated for the first
-               (glong, plx) point and each sample.
+      output["Rgal"] :: scalar or array of scalars
+        Galactocentric radius (kpc).
 
-    Raises:
-      ValueError : if glong, plx, and plx_err are not 1-D; or
-                   if glong, plx, and plx_err are arrays and not the 
-                   same size
-    """
-    #
-    # check inputs
-    #
-    # convert scalar to array if necessary
-    glong_inp, plx_inp, plx_err_inp = np.atleast_1d(glong, plx, plx_err)
-    # check shape of inputs
-    if glong_inp.ndim != 1 or plx_inp.ndim != 1 or plx_err_inp.ndim != 1:
-        raise ValueError("glong, plx, and plx_err must be 1-D")
-    if glong_inp.size != plx_inp.size or glong_inp.size != plx_err_inp.size:
-        raise ValueError("glong, plx, and plx_err must have same size")
-    #
-    # Resample parallaxes
-    #
-    plx_samples = np.random.normal(loc=plx_inp,scale=plx_err_inp,
-                                   size=(num_samples,plx_inp.size)).T
-    # remove negative parallaxes
-    plx_samples[plx_samples < 0.] = np.nan
-    #
-    # Compute parallax distances
-    #
-    plx_out = [parallax(np.ones(num_samples)*l, p,
-                        dist_max=dist_max, R0=R0)
-               for (l,p) in zip(glong_inp, plx_samples)]
-    return plx_out
+      output["distance"] : scalar or array of scalars
+        parallax distance (kpc)
 
-def pdf_parallax_results_worker(plx_samples, kdetype, pdf_bins=100):
-    """
-    Finds the parallax distance and distance uncertainty from the 
-    output of many samples from parallax. See pdf_parallax for more 
-    details.
-
-    Parameters:
-      plx_samples : 1-D array
-                    This array contains the output from parallax
-                    for a parallax distance (kpc) for
-                    many samples (i.e. it is the "Rgal" array from
-                    parallax output)
-      kdetype : string
-                which KDE method to use
-                'pyqt' uses pyqt_fit with linear combination
-                   and boundary at 0
-                'scipy' uses gaussian_kde with no boundary
-      pdf_bins : integer (optional)
-                 number of bins used in calculating PDF
-
-    Returns: kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos
-      kde : scipy.gaussian_kde object
-            The KDE calculated for this kinematic distance
-      peak_dist : scalar
-                  The distance associated with the peak of the PDF
-      peak_dist_err_neg : scalar
-                      The negative uncertainty of peak_dist
-      peak_dist_err_pos : scalar
-                      The positive uncertainty of peak_dist
-    """
-    #
-    # Compute kernel density estimator and PDF
-    #
-    nans = np.isnan(plx_samples)
-    if np.sum(~nans) < 2:
-        # skip if fewer than two non-nans
-        return (None, np.nan, np.nan, np.nan)
-    try:
-        if kdetype == 'scipy':
-            kde = gaussian_kde(plx_samples[~nans])
-        elif kdetype == 'pyqt':
-            kde = pyqt_kde.KDE1D(plx_samples[~nans], lower=0,
-                                 method=kde_methods.linear_combination)
-        else:
-            print("INVALIDE KDE METHOD: {0}".format(kdetype))
-            return (None, np.nan, np.nan, np.nan)
-    except np.linalg.LinAlgError:
-        # catch singular matricies (i.e. all values are the same)
-        return (None, np.nan, np.nan, np.nan)
-    dists = np.linspace(np.nanmin(plx_samples),np.nanmax(plx_samples),
-                        pdf_bins)
-    pdf = kde(dists)
-    #
-    # Find index, value, and distance of peak of PDF
-    #
-    peak_ind = np.argmax(pdf)
-    peak_value = pdf[peak_ind]
-    peak_dist = dists[peak_ind]
-    if np.isnan(peak_value):
-        # too few good samples?
-        return (None, np.nan, np.nan, np.nan)
-    #
-    # Walk down from peak of PDF until integral between two
-    # bounds is 68.3% of the total integral (=1 because it's
-    # normalized). Step size is 1% of peak value.
-    #
-    for target in np.arange(peak_value,0.,-0.01*peak_value):
-        # find bounds
-        if peak_ind == 0:
-            lower = 0
-        else:
-            lower = np.argmin(np.abs(target-pdf[0:peak_ind]))
-        if peak_ind == len(pdf)-1:
-            upper = len(pdf)-1
-        else:
-            upper = np.argmin(np.abs(target-pdf[peak_ind:]))+peak_ind
-        # integrate
-        #integral = kde.integrate_box_1d(dists[lower],dists[upper])
-        integral = integrate.quad(kde,dists[lower],dists[upper])[0]
-        if integral > 0.683:
-            peak_dist_err_neg = peak_dist-dists[lower]
-            peak_dist_err_pos = dists[upper]-peak_dist
-            break
-    else:
-        return (None, np.nan, np.nan, np.nan)
-    #
-    # Return results
-    #
-    return (kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos)
-
-def pdf_parallax(glong,plx,plx_err=None,
-                 dist_max=30.,R0=8.34,
-                 pdf_bins=100,num_samples=1000,
-                 plot_pdf=False,plot_prefix='pdf_',verbose=True):
-    """
-    Return the parallax distance given a parallax and parallax
-    uncertainty. Generate PDF of distance by
-    resampling within uncertainty. Peak of PDF is the returned 
-    distance and width of PDF such that the area enclosed by the 
-    PDF is 68.2% is the returned distance uncertainty.
-
-    Parameters:
-      glong : scalar or 1-D array
-              Galactic longitude (deg). If it is an array, it must
-              have the same size as plx.
-      plx : scalar or 1-D array
-            Parallax in milli-arcseconds
-      plx_err : scalar or 1-D (optional)
-                Parallax uncertainty in milli-arcseconds
-      dist_max : scalar (optional)
-                 The maximum parallax distance to compute (kpc)
-      R0 : scalar (optional)
-           Solar Galactocentric radius (kpc)
-      pdf_bins : integer (optional)
-                 number of bins used to calculate PDF
-      num_samples : integer (optional)
-                    Number of MC samples to use when generating PDF
-      plot_pdf : bool (optional)
-                 If True, plot each PDF. Filenames are
-                 plot_prefix+"{0}plx_{1}err.pdf".
-      plot_prefix : string (optional)
-                    The prefix for the plot filenames.
-      verbose : bool (optional)
-                If True, output status updates and total runtime
-    
-    Returns: output
-      output["Rgal"] : scalar or 1-D array
-                       Galactocentric radius (kpc).
-      output["Rgal_err_neg"] : scalar or 1-D array
-                               Galactocentric radius uncertainty in
-                               the negative direction (kpc).
-      output["Rgal_err_pos"] : scalar or 1-D array
-                               Galactocentric radius uncertainty in
-                               the positive direction (kpc).
-      output["Rgal_kde"] : PyQTFit Kenel Density Estimator
-                           The KDE for Galactocentric radius.
-      output["distance"] : scalar or 1-D array
-                           parallax distance (kpc)
-      output["distance_err_neg"] : scalar or 1-D array
-                                   distance uncertainty
-                                   in the negative direction (kpc)
-      output["distance_err_pos"] : scalar or 1-D array
-                                   distance uncertainty
-                                   in the positive direction (kpc)
-      output["distance_kde"] : PyQTFit Kenel Density Estimator
-                               The KDE for distance.
-      If glong and plx are scalars, each of these is a scalar.
-      Otherwise they have shape (glong.size).
+      Each of these values is the mode of the posterior distribution.
+      Also included in the dictionary for each of these parameters
+      are param+"_err_neg" and param+"_err_pos", which define the
+      68.3% Bayesian credible interval around the mode, and
+      param+"_kde", which is the kernel density estimator fit to the
+      posterior samples.
 
     Raises:
       ValueError : if glong and plx are not 1-D; or
                    if glong and plx are arrays and not the same size
+
     """
-    total_start = time.time()
     #
     # check inputs
     #
-    # convert scalar to array if necessary
-    glong_inp, plx_inp = np.atleast_1d(glong, plx)
     # check shape of inputs
-    if glong_inp.ndim != 1 or plx_inp.ndim != 1:
-        raise ValueError("glong and plx_ must be 1-D")
-    if glong_inp.size != plx_inp.size:
+    glong, plx = np.atleast_1d(glong, plx)
+    if glong.shape != plx.shape:
         raise ValueError("glong and plx must have same size")
+    if (plx_err is not None and not np.isscalar(plx_err) and
+        plx_err.shape != plx.shape):
+        raise ValueError("plx_err must be scalar or have same shape as plx")
     #
-    # Storage for final PDF kinematic distance results
+    # Storage for final PDF parallax distance results
     #
-    results = {"Rgal": np.zeros(plx_inp.size),
-               "Rgal_kde": np.empty(shape=(plx_inp.size,),
-                                    dtype=object),
-               "Rgal_err_neg": np.zeros(plx_inp.size),
-               "Rgal_err_pos": np.zeros(plx_inp.size),
-               "distance": np.zeros(plx_inp.size),
-               "distance_kde": np.empty(shape=(plx_inp.size,),
-                                    dtype=object),
-               "distance_err_neg": np.zeros(plx_inp.size),
-               "distance_err_pos": np.zeros(plx_inp.size)}
+    results = {"Rgal": np.zeros(plx.shape),
+               "Rgal_kde": np.empty(shape=plx.shape, dtype=object),
+               "Rgal_err_neg": np.zeros(plx.shape),
+               "Rgal_err_pos": np.zeros(plx.shape),
+               "distance": np.zeros(plx.shape),
+               "distance_kde": np.empty(shape=plx.shape, dtype=object),
+               "distance_err_neg": np.zeros(plx.shape),
+               "distance_err_pos": np.zeros(plx.shape)}
     #
     # Calculate parallax distances
     #
-    plx_out = parallax_worker(num_samples, glong_inp, plx_inp,
-                              plx_err=plx_err, dist_max=dist_max,
-                              R0=R0)
+    plx_out = parallax(
+        glong, plx, plx_err=plx_err, dist_max=dist_max, R0=R0,
+        R0_err=R0_err, resample=True, size=num_samples)
     #
-    # Calculate PDF parallax distance
+    # Get modes and BICs
     #
-    for plxtype, kdetype in zip(["Rgal","distance"],["pyqt","pyqt"]):
-        for i,my_plx_out in enumerate(plx_out):
-            my_pdfplx_out = pdf_parallax_results_worker(my_plx_out[plxtype], kdetype,
-                                                        pdf_bins=pdf_bins)
-            kde, peak_dist, peak_dist_err_neg, peak_dist_err_pos = \
-                my_pdfplx_out
-            results[plxtype][i] = peak_dist
-            results[plxtype+"_kde"][i] = kde
-            results[plxtype+"_err_neg"][i] = peak_dist_err_neg
-            results[plxtype+"_err_pos"][i] = peak_dist_err_pos
+    kdtypes = ["Rgal", "distance"]
+    kdetypes = ["pyqt", "pyqt"]
+    for kdtype, kdetype in zip(kdtypes, kdetypes):
+        if glong.size == 1:
+            kde, mode, lower, upper = calc_hpd(
+                plx_out[kdtype], kdetype, alpha=0.683,
+                pdf_bins=pdf_bins)
+            results[kdtype] = mode
+            results[kdtype+"_kde"] = kde
+            results[kdtype+"_err_neg"] = mode-lower
+            results[kdtype+"_err_pos"] = upper-mode
+        else:
+            for i in np.ndindex(glong.shape):
+                kde, mode, lower, upper = calc_hpd(
+                    plx_out[kdtype][i], kdetype, alpha=0.683,
+                    pdf_bins=pdf_bins)
+                results[kdtype][i] = mode
+                results[kdtype+"_kde"][i] = kde
+                results[kdtype+"_err_neg"][i] = mode-lower
+                results[kdtype+"_err_pos"][i] = upper-mode
     #
     # Plot PDFs and results
     #
     if plot_pdf:
-        #
-        # Loop over longitude, plx
-        #
-        for i,(l,p) in enumerate(zip(glong_inp,plx_inp)):
+        for i in np.ndindex(glong.shape):
             #
             # Set-up figure
             #
-            fig, (ax1, ax2) = \
-              plt.subplots(2, figsize=(8.5,5.5))
-            ax1.set_title(r"PDFs for ($\ell$, $\pi$) = ("
-                          "{0:.1f}".format(l)+r"$^\circ$, "
-                          "{0:.3f}".format(p)+r" mas)")
+            fig, axes = plt.subplots(2, figsize=(8.5, 5.5))
+            axes[0].set_title(
+                r"PDFs for ($\ell$, $\pi$) = ("
+                "{0:.1f}".format(glong[i])+r"$^\circ$, "
+                "{0:.3f}".format(plx[i])+r" mas)")
             #
             # Compute "traditional" parallax distances
             #
-            plx_d = parallax(l,p,dist_max=dist_max,R0=R0)
-            kdtypes = ["Rgal","distance"]
-            labels = [r"$R$ (kpc)",r"$d$ (kpc)"]
-            for ax,kdtype,label in zip([ax1,ax2],kdtypes, labels):
+            plx_d = parallax(glong[i], plx[i], dist_max=dist_max, R0=R0)
+            kdtypes = ["Rgal", "distance"]
+            labels = [r"$R$ (kpc)", r"$d$ (kpc)"]
+            for ax, kdtype, label in zip(axes, kdtypes, labels):
                 # find bad data
-                out = plx_out[i][kdtype]
+                if glong.size == 1:
+                    out = plx_out[kdtype]
+                else:
+                    out = plx_out[kdtype][i]
                 out = out[~np.isnan(out)]
                 # skip if kde failed (all data is bad)
                 if results[kdtype+"_kde"][i] is None:
                     continue
                 # set-up bins
                 binwidth = (np.max(out)-np.min(out))/20.
-                bins = np.arange(np.min(out),
-                                 np.max(out)+binwidth,
-                                 binwidth)
+                bins = np.arange(
+                    np.min(out), np.max(out)+binwidth, binwidth)
                 distwidth = (np.max(out)-np.min(out))/200.
-                dists = np.arange(np.min(out),
-                                  np.max(out)+distwidth,
-                                  distwidth)
+                dists = np.arange(
+                    np.min(out), np.max(out)+distwidth, distwidth)
                 pdf = results[kdtype+"_kde"][i](dists)
-                ax.hist(out,bins=bins,normed=True,
-                        facecolor='white',edgecolor='black',lw=2,
-                        zorder=1)
-                ax.plot(dists,pdf,'k-',zorder=3)
-                err_dists = \
-                  np.arange(results[kdtype][i]-results[kdtype+"_err_neg"][i],
-                            results[kdtype][i]+results[kdtype+"_err_pos"][i],
-                            distwidth)
+                ax.hist(
+                    out, bins=bins, density=True, facecolor='white',
+                    edgecolor='black', lw=2, zorder=1)
+                ax.plot(dists, pdf, 'k-', zorder=3)
+                err_dists = np.arange(
+                    results[kdtype][i]-results[kdtype+"_err_neg"][i],
+                    results[kdtype][i]+results[kdtype+"_err_pos"][i],
+                    distwidth)
                 err_pdf = results[kdtype+"_kde"][i](err_dists)
-                ax.fill_between(err_dists,0,err_pdf,color='gray',
-                                alpha=0.5,zorder=2)
-                ax.axvline(results[kdtype][i],linestyle='solid',
-                           color='k',zorder=3)
-                ax.axvline(plx_d[kdtype],linestyle='dashed',
-                           color='k',zorder=3)
+                ax.fill_between(
+                    err_dists, 0, err_pdf, color='gray', alpha=0.5,
+                    zorder=2)
+                ax.axvline(
+                    results[kdtype][i], linestyle='solid', color='k',
+                    zorder=3)
+                ax.axvline(
+                    plx_d[kdtype], linestyle='dashed', color='k',
+                    zorder=3)
                 ax.set_xlabel(label)
                 ax.set_ylabel("Normalized PDF")
-                ax.set_xlim(np.min(out),
-                            np.max(out))
+                ax.set_xlim(np.min(out), np.max(out))
                 # turn off grid
                 ax.grid(False)
             plt.tight_layout()
-            plt.savefig(plot_prefix+"{0}glong_{1}plx.pdf".format(l,p))
+            fname = "{0}{1}_{2}.pdf".format(
+                plot_prefix, glong[i], plx[i])
+            plt.savefig(fname)
             plt.close(fig)
-    #
-    # Convert results to scalar if necessary
-    #
-    if glong_inp.size == 1:
-        for key in results.keys():
-            results[key] = results[key][0]
-    total_end = time.time()
-    if verbose:
-        run_time = total_end-total_start
-        time_h = int(run_time/3600.)
-        time_m = int((run_time-3600.*time_h)/60.)
-        time_s = int(run_time-3600.*time_h-60.*time_m)    
-        print("Total Runtime: {0:02}h {1:02}m {2:02}s".\
-              format(time_h,time_m,time_s))    
     return results
