@@ -27,11 +27,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
+import pathos.multiprocessing as mp
+
 from kd import kd_utils
 
 # Solar Galactocentric radius and error from Reid+2019
 __R0 = 8.15 # kpc
 __R0_err = 0.15 # kpc
+
+class Worker:
+    """
+    Multiprocessing wrapper class
+    """
+    def __init__(self, glong, plx, plx_err, dist_max,
+                 resample, size, R0, R0_err):
+        self.glong = glong
+        self.plx = plx
+        self.plx_err = plx_err
+        self.dist_max = dist_max
+        self.resample = resample
+        self.size = size
+        self.R0 = R0
+        self.R0_err = R0_err
+
+    def work(self, snum):
+        #
+        # Random seed at each iteration
+        #
+        np.random.seed()
+        #
+        # Resample parallax and R0
+        #
+        if self.resample:
+            plx_sample = np.random.normal(
+                loc=self.plx, scale=self.plx_err)
+            R0_sample = np.random.normal(
+                loc=self.R0, scale=self.R0_err)
+        else:
+            plx_sample = self.plx
+            R0_sample = self.R0
+        #
+        # Compute distances from parallax, catch large distances
+        #
+        distance = 1./plx_sample # kpc
+        distance[distance > self.dist_max] = np.nan
+        #
+        # Compute Galactocentric radius
+        #
+        Rgal = kd_utils.calc_Rgal(self.glong, distance, R0=R0_sample)
+        return (distance, Rgal)
 
 def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
              R0_err=__R0_err, resample=False, size=1):
@@ -79,7 +123,7 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
         if plx_err.shape != plx.shape:
             raise ValueError("plx_err must be scalar or have same shape as plx")
     #
-    # Default velo_err to 0, sample size to 1
+    # Default plx_err to 0, sample size to 1
     #
     elif plx_err is None:
         plx_err = 0.
@@ -90,36 +134,20 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
     # ensure range [0,360) degrees
     glong = glong % 360.
     #
-    # Storage for results
+    # Initialize worker
+    #
+    worker = Worker(glong, plx, plx_err, dist_max,
+                    resample, size, R0, R0_err)
+    with mp.Pool() as pool:
+        results = pool.map(worker.work, range(size))
+    #
+    # Store results
     #
     distance_samples = np.ones((len(glong), size), dtype=float)*np.nan
     Rgal_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    #
-    # Get nominal parameters
-    #
-    R0_sample = R0
-    plx_sample = np.copy(plx)
-    for snum in range(size):
-        #
-        # Resample parallax and R0
-        #
-        if resample:
-            plx_sample = np.random.normal(loc=plx, scale=plx_err)
-            R0_sample = np.random.normal(loc=R0, scale=R0_err)
-        #
-        # Compute distances from parallax, catch large distances
-        #
-        distance = 1./plx_sample # kpc
-        distance[distance > dist_max] = np.nan
-        #
-        # Compute Galactocentric radius
-        #
-        Rgal = kd_utils.calc_Rgal(glong, distance, R0=R0_sample)
-        #
-        # Save
-        #
-        distance_samples[:, snum] = distance
-        Rgal_samples[:, snum] = Rgal
+    for snum, result in enumerate(results):
+        distance_samples[:, snum] = result[0]
+        Rgal_samples[:, snum] = result[1]
     #
     # Convert back to scalars if necessary
     #

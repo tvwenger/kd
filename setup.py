@@ -27,5 +27,5 @@ setup(
    author='Trey V. Wenger',
    author_email='tvwenger@gmail.com',
    packages=['kd'],
-   install_requires=['numpy', 'matplotlib', 'scipy'],
+   install_requires=['numpy', 'matplotlib', 'scipy', 'pathos'],
 )

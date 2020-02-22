@@ -29,8 +29,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import importlib
 import numpy as np
+import pathos.multiprocessing as mp
 
 from kd import kd_utils
+
+class Worker:
+    """
+    Multiprocessing wrapper class
+    """
+    def __init__(self, glong, velo, velo_err, dists, glong_grid,
+                 dist_grid, velo_tol, rotcurve, resample, size):
+        self.glong = glong
+        self.velo = velo
+        self.velo_err = velo_err
+        self.dists = dists
+        self.glong_grid = glong_grid
+        self.dist_grid = dist_grid
+        self.velo_tol = velo_tol
+        self.resample = resample
+        self.size = size
+        #
+        # Get rotation curve module
+        #
+        self.rotcurve_module = importlib.import_module('kd.'+rotcurve)
+        #
+        # Get nominal rotation curve parameters
+        #
+        self.nominal_params = self.rotcurve_module.nominal_params()
+
+    def work(self, snum):
+        #
+        # Random seed at each iteration
+        #
+        np.random.seed()
+        #
+        # Resample velocity and rotation curve parameters
+        #
+        if self.resample:
+            params = self.rotcurve_module.resample_params(
+                size=len(self.glong))
+            velo_sample = np.random.normal(
+                loc=self.velo, scale=self.velo_err)
+        else:
+            params = self.nominal_params
+            velo_sample = self.velo
+        #
+        # Calculate LSR velocity at each (glong, distance) point
+        #
+        grid_vlsrs = self.rotcurve_module.calc_vlsr(
+            self.glong_grid, self.dist_grid, **params)
+        #
+        # Get index of tangent point along each direction
+        #
+        tan_idxs = np.array([
+            np.argmax(vlsr) if l < 90. else np.argmin(vlsr) if l > 270.
+            else -1 for l, vlsr in zip(self.glong, grid_vlsrs.T)])
+        #
+        # Get index of near and far distances along each direction
+        #
+        near_idxs = np.array([
+            np.argmin(np.abs(vlsr[:tan_idx]-v)) if
+            (tan_idx != -1 and np.min(np.abs(vlsr[:tan_idx]-v)) < self.velo_tol)
+            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
+        far_idxs = np.array([
+            tan_idx+np.argmin(np.abs(vlsr[tan_idx:]-v)) if
+            (tan_idx != -1 and np.min(np.abs(vlsr[tan_idx:]-v)) < self.velo_tol)
+            else np.argmin(np.abs(vlsr-v)) if
+            (tan_idx == -1 and np.min(np.abs(vlsr-v)) < self.velo_tol)
+            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
+        #
+        # Get VLSR of tangent point
+        #
+        vlsr_tan = np.array([
+            vlsr[tan_idx] if tan_idx != -1 else np.nan
+            for vlsr, tan_idx in zip(grid_vlsrs.T, tan_idxs)])
+        #
+        # Get distances
+        #
+        tan_dists = self.dists[tan_idxs]
+        tan_dists[tan_idxs == -1] = np.nan
+        near_dists = self.dists[near_idxs]
+        near_dists[near_idxs == -1] = np.nan
+        far_dists = self.dists[far_idxs]
+        far_dists[far_idxs == -1] = np.nan
+        Rgal = kd_utils.calc_Rgal(
+            self.glong, far_dists.T, R0=params['R0']).T
+        Rtan = kd_utils.calc_Rgal(
+            self.glong, tan_dists.T, R0=params['R0']).T
+        return (tan_dists, near_dists, far_dists, vlsr_tan, Rgal, Rtan)
 
 def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
                 rotcurve='reid19_rotcurve',
@@ -136,86 +222,39 @@ def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
     # ensure range [0,360) degrees
     glong = glong % 360.
     #
-    # import rotation curve
-    #
-    rotcurve_module = importlib.import_module('kd.'+rotcurve)
-    #
     # Create array of distances, then grid of (dists, glongs)
     #
     dists = np.arange(dist_min, dist_max+dist_res, dist_res)
     dist_grid, glong_grid = np.meshgrid(dists, glong, indexing='ij')
     #
-    # Storage for results
+    # Initialize worker
     #
-    tan_idx_samples = np.ones((len(glong), size), dtype=int)*-1
-    near_idx_samples = np.ones((len(glong), size), dtype=int)*-1
-    far_idx_samples = np.ones((len(glong), size), dtype=int)*-1
+    worker = Worker(glong, velo, velo_err, dists, glong_grid, dist_grid,
+                    velo_tol, rotcurve, resample, size)
+    with mp.Pool() as pool:
+        results = pool.map(worker.work, range(size))
+    #
+    # Store results
+    #
+    tan_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    near_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    far_samples = np.ones((len(glong), size), dtype=float)*np.nan
     vlsr_tan_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    #
-    # Get nominal parameters
-    #
-    params = rotcurve_module.nominal_params()
-    velo_sample = np.copy(velo)
-    for snum in range(size):
-        #
-        # Resample velocity and rotation curve parameters
-        #
-        if resample:
-            params = rotcurve_module.resample_params(size=glong.size)
-            velo_sample = np.random.normal(loc=velo, scale=velo_err)
-        #
-        # Calculate LSR velocity at each (glong, distance) point
-        #
-        grid_vlsrs = rotcurve_module.calc_vlsr(
-            glong_grid, dist_grid, **params)
-        #
-        # Get index of tangent point along each direction
-        #
-        tan_idxs = np.array([
-            np.argmax(vlsr) if l < 90. else np.argmin(vlsr) if l > 270.
-            else -1 for l, vlsr in zip(glong, grid_vlsrs.T)])
-        #
-        # Get index of near and far distances along each direction
-        #
-        near_idxs = np.array([
-            np.argmin(np.abs(vlsr[:tan_idx]-v)) if
-            (tan_idx != -1 and np.min(np.abs(vlsr[:tan_idx]-v)) < velo_tol)
-            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
-        far_idxs = np.array([
-            tan_idx+np.argmin(np.abs(vlsr[tan_idx:]-v)) if
-            (tan_idx != -1 and np.min(np.abs(vlsr[tan_idx:]-v)) < velo_tol)
-            else np.argmin(np.abs(vlsr-v)) if
-            (tan_idx == -1 and np.min(np.abs(vlsr-v)) < velo_tol)
-            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
-        #
-        # Get VLSR of tangent point
-        #
-        vlsr_tan = np.array([
-            vlsr[tan_idx] if tan_idx != -1 else np.nan
-            for vlsr, tan_idx in zip(grid_vlsrs.T, tan_idxs)])
-        #
-        # Save
-        #
-        tan_idx_samples[:, snum] = tan_idxs
-        near_idx_samples[:, snum] = near_idxs
-        far_idx_samples[:, snum] = far_idxs
-        vlsr_tan_samples[:, snum] = vlsr_tan
-    #
-    # Assign distances from indicies
-    #
-    tan_dist = dists[tan_idx_samples]
-    tan_dist[tan_idx_samples == -1] = np.nan
-    near_dist = dists[near_idx_samples]
-    near_dist[near_idx_samples == -1] = np.nan
-    far_dist = dists[far_idx_samples]
-    far_dist[far_idx_samples == -1] = np.nan
-    Rgal = kd_utils.calc_Rgal(glong, far_dist.T, R0=params['R0']).T
-    Rtan = kd_utils.calc_Rgal(glong, tan_dist.T, R0=params['R0']).T
+    Rgal_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    Rtan_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    for snum, result in enumerate(results):
+        tan_samples[:, snum] = result[0]
+        near_samples[:, snum] = result[1]
+        far_samples[:, snum] = result[2]
+        vlsr_tan_samples[:, snum] = result[3]
+        Rgal_samples[:, snum] = result[4]
+        Rtan_samples[:, snum] = result[5]
     #
     # Convert back to scalars if necessary
     #
-    output = {"Rgal": Rgal, "Rtan": Rtan, "near": near_dist,
-              "far": far_dist, "tangent": tan_dist,
+    output = {"Rgal": Rgal_samples, "Rtan": Rtan_samples,
+              "near": near_samples, "far": far_samples,
+              "tangent": tan_samples,
               "vlsr_tangent": vlsr_tan_samples}
     if size == 1:
         for key in output:

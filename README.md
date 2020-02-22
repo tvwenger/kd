@@ -5,6 +5,7 @@ Utilities to calculate kinematic distances and kinematic distance uncertainties.
 3. https://zenodo.org/record/1166001
 
 ## New in Version 2.0
+0. Re-added multiprocessing from `pdf_kd` and `pdf_parallax`
 1. Added support for [Reid et al. (2019)](https://ui.adsabs.harvard.edu/abs/2019ApJ...885..131R/abstract) rotation curve.
 2. Added parameter covariences for Reid et al. (2019) rotation curve.
 3. Fixed minor bug in Reid et al. (2014) rotation curve.
