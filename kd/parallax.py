@@ -71,6 +71,7 @@ class Worker:
         #
         distance = 1./plx_sample # kpc
         distance[distance > self.dist_max] = np.nan
+        distance[distance < 0.] = np.nan
         #
         # Compute Galactocentric radius
         #

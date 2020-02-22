@@ -166,14 +166,22 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
             kdtypes = ["Rgal", "distance"]
             labels = [r"$R$ (kpc)", r"$d$ (kpc)"]
             for ax, kdtype, label in zip(axes, kdtypes, labels):
-                # find bad data
                 if glong.size == 1:
                     out = plx_out[kdtype]
+                    peak = results[kdtype]
+                    kde = results[kdtype+"_kde"]
+                    err_neg = results[kdtype+"_err_neg"]
+                    err_pos = results[kdtype+"_err_pos"]
                 else:
                     out = plx_out[kdtype][i]
+                    peak = results[kdtype][i]
+                    kde = results[kdtype+"_kde"][i]
+                    err_neg = results[kdtype+"_err_neg"][i]
+                    err_pos = results[kdtype+"_err_pos"][i]
+                # find bad data
                 out = out[~np.isnan(out)]
                 # skip if kde failed (all data is bad)
-                if results[kdtype+"_kde"][i] is None:
+                if kde is None:
                     continue
                 # set-up bins
                 binwidth = (np.max(out)-np.min(out))/20.
@@ -182,21 +190,19 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
                 distwidth = (np.max(out)-np.min(out))/200.
                 dists = np.arange(
                     np.min(out), np.max(out)+distwidth, distwidth)
-                pdf = results[kdtype+"_kde"][i](dists)
+                pdf = kde(dists)
                 ax.hist(
                     out, bins=bins, density=True, facecolor='white',
                     edgecolor='black', lw=2, zorder=1)
                 ax.plot(dists, pdf, 'k-', zorder=3)
                 err_dists = np.arange(
-                    results[kdtype][i]-results[kdtype+"_err_neg"][i],
-                    results[kdtype][i]+results[kdtype+"_err_pos"][i],
-                    distwidth)
-                err_pdf = results[kdtype+"_kde"][i](err_dists)
+                    peak-err_neg, peak+err_pos, distwidth)
+                err_pdf = kde(err_dists)
                 ax.fill_between(
                     err_dists, 0, err_pdf, color='gray', alpha=0.5,
                     zorder=2)
                 ax.axvline(
-                    results[kdtype][i], linestyle='solid', color='k',
+                    peak, linestyle='solid', color='k',
                     zorder=3)
                 ax.axvline(
                     plx_d[kdtype], linestyle='dashed', color='k',
