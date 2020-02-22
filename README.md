@@ -18,6 +18,7 @@ The following packages are required for this module to work "out-of-the-box"
 2. `scipy`
 3. `matplotlib`
 4. `pyqt_fit` (N.B. The currently available version on PyPI, as of January 2020, has a dependency issue. I have [forked the repository](https://github.com/tvwenger/pyqt-fit) and corrected the issue.)
+5. `pathos` (for multiprocessing)
 
 The easiest way to install this package is
 ```bash
