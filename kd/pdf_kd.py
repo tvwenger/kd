@@ -31,13 +31,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pathos.multiprocessing as mp
 
 from kd.rotcurve_kd import rotcurve_kd
 from kd.kd_utils import calc_hpd
 
+def calc_hpd_wrapper(args):
+    """
+    Multiprocessing wrapper from KDE results.
+    """
+    return calc_hpd(args[0], args[1], alpha=args[2], pdf_bins=args[3])
+
 def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
            rotcurve_dist_res=0.001, rotcurve_dist_max=30.,
-           pdf_bins=1000, num_samples=1000,
+           pdf_bins=1000, num_samples=10000,
            plot_pdf=False, plot_prefix='pdf_'):
     """
     Return the kinematic near, far, and tanget distance and distance
@@ -118,6 +125,7 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
     # check inputs
     #
     # check shape of inputs
+    input_scalar = np.isscalar(glong)
     glong, velo = np.atleast_1d(glong, velo)
     if glong.shape != velo.shape:
         raise ValueError("glong and velo must have same shape")
@@ -165,28 +173,29 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
         rotcurve=rotcurve, dist_res=rotcurve_dist_res, dist_min=0.01,
         dist_max=rotcurve_dist_max, resample=True, size=num_samples)
     #
-    # Get modes and BICs
+    # Set up multiprocessing for fitting KDEs
     #
     kdtypes = ["Rgal", "Rtan", "near", "far", "tangent", "vlsr_tangent"]
     kdetypes = ["pyqt", "pyqt", "pyqt", "pyqt", "pyqt", "scipy"]
+    args = []
     for kdtype, kdetype in zip(kdtypes, kdetypes):
-        if glong.size == 1:
-            kde, mode, lower, upper = calc_hpd(
-                kd_out[kdtype], kdetype, alpha=0.683,
-                pdf_bins=pdf_bins)
-            results[kdtype] = mode
-            results[kdtype+"_kde"] = kde
-            results[kdtype+"_err_neg"] = mode-lower
-            results[kdtype+"_err_pos"] = upper-mode
-        else:
-            for i in np.ndindex(glong.shape):
-                kde, mode, lower, upper = calc_hpd(
-                    kd_out[kdtype][i], kdetype, alpha=0.683,
-                    pdf_bins=pdf_bins)
-                results[kdtype][i] = mode
-                results[kdtype+"_kde"][i] = kde
-                results[kdtype+"_err_neg"][i] = mode-lower
-                results[kdtype+"_err_pos"][i] = upper-mode
+        for i in np.ndindex(glong.shape):
+            args.append((
+                kd_out[kdtype][i], kdetype, 0.683, pdf_bins))
+    with mp.Pool() as pool:
+        kde_results = pool.map(calc_hpd_wrapper, args)
+    #
+    # Get results
+    #
+    nresult = 0
+    for kdtype, kdetype in zip(kdtypes, kdetypes):
+        for i in np.ndindex(glong.shape):
+            kde, mode, lower, upper = kde_results[nresult]
+            results[kdtype][i] = mode
+            results[kdtype+"_kde"][i] = kde
+            results[kdtype+"_err_neg"][i] = mode-lower
+            results[kdtype+"_err_pos"][i] = upper-mode
+            nresult += 1
     #
     # Plot PDFs
     #
@@ -212,18 +221,11 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
                       r"$d_{\rm near}$ (kpc)", r"$d_{\rm far}$ (kpc)",
                       r"$d_{\rm tan}$ (kpc)"]
             for ax, kdtype, label in zip(axes, kdtypes, labels):
-                if glong.size == 1:
-                    out = kd_out[kdtype]
-                    peak = results[kdtype]
-                    kde = results[kdtype+"_kde"]
-                    err_neg = results[kdtype+"_err_neg"]
-                    err_pos = results[kdtype+"_err_pos"]
-                else:
-                    out = kd_out[kdtype][i]
-                    peak = results[kdtype][i]
-                    kde = results[kdtype+"_kde"][i]
-                    err_neg = results[kdtype+"_err_neg"][i]
-                    err_pos = results[kdtype+"_err_pos"][i]
+                out = kd_out[kdtype][i]
+                peak = results[kdtype][i]
+                kde = results[kdtype+"_kde"][i]
+                err_neg = results[kdtype+"_err_neg"][i]
+                err_pos = results[kdtype+"_err_pos"][i]
                 # find bad data
                 out = out[~np.isnan(out)]
                 # skip if kde failed (all data is bad)
@@ -263,4 +265,7 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
                 plot_prefix, glong[i], velo[i])
             plt.savefig(fname)
             plt.close(fig)
+    if input_scalar:
+        for key in results:
+            results[key] = results[key][0]
     return results

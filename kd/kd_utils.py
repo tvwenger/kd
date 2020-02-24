@@ -96,6 +96,8 @@ def calc_az(glong, dist, R0=__R0):
       az :: scalar or array of scalars
         Galactocentric azimuth (degs).
     """
+    input_scalar = np.isscalar(glong) and np.isscalar(dist)
+    glong, dist = np.atleast_1d(glong, dist)
     # ensure longitude range [0,360) degrees
     glong = glong % 360.
     #
@@ -106,7 +108,6 @@ def calc_az(glong, dist, R0=__R0):
     # law of cosines
     #
     cos_az = (R0**2. + Rgal**2. - dist**2.)/(2.*Rgal*R0)
-    cos_az = np.atleast_1d(cos_az)
     #
     # Catch fringe cases
     #
@@ -116,14 +117,8 @@ def calc_az(glong, dist, R0=__R0):
     #
     # Correct azimuth in 3rd and 4th quadrants
     #
-    glong = np.atleast_1d(glong)
-    if glong.size == az.size:
-        az[glong > 180.] = 360. - az[glong > 180.]
-    elif glong.size == 1 and glong[0] > 180:
-        az = 360. - az
-    else:
-        raise ValueError("Shape mismatch glong and az")
-    if az.size == 1:
+    az[glong > 180.] = 360. - az[glong > 180.]
+    if input_scalar:
         return az[0]
     return az
 
@@ -175,6 +170,8 @@ def calc_glong(az, Rgal, R0=__R0):
       glong :: scalar or array of scalars
         Galactic longitude (degs).
     """
+    input_scalar = np.isscalar(az) and np.isscalar(Rgal)
+    az, glong = np.atleast_1d(az, glong)
     # ensure azimuth range [0,360) degrees
     az = az % 360.
     #
@@ -185,7 +182,6 @@ def calc_glong(az, Rgal, R0=__R0):
     # law of cosines
     #
     cos_glong = (R0**2. + dist**2. - Rgal**2.)/(2.*dist*R0)
-    cos_glong = np.atleast_1d(cos_glong)
     #
     # Catch fringe cases
     #
@@ -195,14 +191,8 @@ def calc_glong(az, Rgal, R0=__R0):
     #
     # Correct longitude in 3rd and 4th quadrants
     #
-    az = np.atleast_1d(az)
-    if az.size == glong.size:
-        glong[az > 180.] = 360. - glong[az > 180.]
-    elif az.size == 1 and az[0] > 180:
-        glong = 360. - glong
-    else:
-        raise ValueError("Shape mismatch glong and az")
-    if glong.size == 1:
+    glong[az > 180.] = 360. - glong[az > 180.]
+    if input_scalar:
         return glong[0]
     return glong
 
@@ -285,6 +275,7 @@ def calc_anderson2012_uncertainty(glong, vlsr):
                    if glong and vlsr are arrays and 
                    not the same size
     """
+    input_scalar = np.isscalar(glong)
     glong, vlsr = np.atleast_1d(glong, vlsr)
     if np.shape(glong) != np.shape(vlsr):
         raise ValueError("glong and vlsr must have same shape")
@@ -311,7 +302,7 @@ def calc_anderson2012_uncertainty(glong, vlsr):
     near_err = a12_near_err[best_glong, best_vlsr]
     far_err = a12_far_err[best_glong, best_vlsr]
     tangent_err = np.nanmax(np.vstack((near_err, far_err)),axis=0)
-    if glong.size == 1:
+    if input_scalar:
         return (near_err[0], far_err[0], tangent_err[0])
     return (near_err, far_err, tangent_err)
 

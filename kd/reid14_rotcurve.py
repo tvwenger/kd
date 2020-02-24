@@ -98,6 +98,8 @@ def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
       theta :: scalar or array of scalars
         circular orbit speed at R (km/s)
     """
+    input_scalar = np.isscalar(R)
+    R = np.atleast_1d(R)
     #
     # Equations 8, 9, 10, 11a, 11b in Persic+1996
     #
@@ -112,14 +114,13 @@ def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     # Catch non-physical case where Vd2 + Vh2 < 0
     #
     Vtot = Vd2 + Vh2
-    if np.isscalar(Vtot) and Vtot < 0.:
-        Vtot = np.nan
-    elif not np.isscalar(Vtot):
-        Vtot[Vtot < 0.] = np.nan
+    Vtot[Vtot < 0.] = np.nan
     #
     # Circular velocity
     #
     theta = a1 * np.sqrt(Vtot)
+    if input_scalar:
+        return theta[0]
     return theta
 
 def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
@@ -144,14 +145,13 @@ def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
       vlsr :: scalar or array of scalars
         LSR velocity (km/s).
     """
+    input_scalar = np.isscalar(glong) and np.isscalar(dist)
+    glong, dist = np.atleast_1d(glong, dist)
     #
     # Convert distance to Galactocentric radius, catch small Rgal
     #
     Rgal = kd_utils.calc_Rgal(glong, dist, R0=R0)
-    if np.isscalar(Rgal) and Rgal < 1.e-6:
-        Rgal = 1.e-6
-    elif not np.isscalar(Rgal):
-        Rgal[Rgal < 1.e-6] = 1.e-6
+    Rgal[Rgal < 1.e-6] = 1.e-6
     #
     # Rotation curve circular velocity
     #
@@ -163,4 +163,6 @@ def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     #
     vlsr = R0 * np.sin(np.deg2rad(glong))
     vlsr = vlsr * ((theta/Rgal) - (theta0/R0))
+    if input_scalar:
+        return vlsr[0]
     return vlsr

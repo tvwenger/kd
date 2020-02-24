@@ -199,6 +199,7 @@ def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
     # check inputs
     #
     # convert scalar to array if necessary
+    input_scalar = np.isscalar(glong)
     glong, velo = np.atleast_1d(glong, velo)
     inp_shape = glong.shape
     glong = glong.flatten()
@@ -259,7 +260,7 @@ def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
     if size == 1:
         for key in output:
             output[key] = np.squeeze(output[key], axis=-1)
-    if glong.size == 1:
+    if input_scalar:
         for key in output:
             output[key] = output[key][0]
     else:
