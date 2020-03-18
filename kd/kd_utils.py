@@ -171,7 +171,7 @@ def calc_glong(az, Rgal, R0=__R0):
         Galactic longitude (degs).
     """
     input_scalar = np.isscalar(az) and np.isscalar(Rgal)
-    az, glong = np.atleast_1d(az, glong)
+    az, Rgal = np.atleast_1d(az, Rgal)
     # ensure azimuth range [0,360) degrees
     az = az % 360.
     #
