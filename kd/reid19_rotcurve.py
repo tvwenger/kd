@@ -35,14 +35,14 @@ from kd import kd_utils
 #
 # Reid+2019 A5 rotation model parameters
 #
-__R0 = 8.15
-__Usun = 10.6
-__Vsun = 10.7
-__Wsun = 7.6
-__Upec = 6.0
-__Vpec = -4.3
-__a2 = 0.96
-__a3 = 1.62
+__R0 = 8.166
+__Usun = 10.449
+__Vsun = 12.092
+__Wsun = 7.729
+__Upec = 5.796
+__Vpec = -3.489
+__a2 = 0.977
+__a3 = 1.623
 __Zsun = 5.5
 __roll = 0.0
 
