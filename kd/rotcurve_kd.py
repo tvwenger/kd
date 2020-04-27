@@ -37,9 +37,10 @@ class Worker:
     """
     Multiprocessing wrapper class
     """
-    def __init__(self, glong, velo, velo_err, dists, glong_grid,
+    def __init__(self, glong, glat, velo, velo_err, dists, glong_grid,
                  dist_grid, velo_tol, rotcurve, resample, size):
         self.glong = glong
+        self.glat = glat
         self.velo = velo
         self.velo_err = velo_err
         self.dists = dists
@@ -77,7 +78,7 @@ class Worker:
         # Calculate LSR velocity at each (glong, distance) point
         #
         grid_vlsrs = self.rotcurve_module.calc_vlsr(
-            self.glong_grid, self.dist_grid, **params)
+            self.glong_grid, self.glat, self.dist_grid, **params)
         #
         # Get index of tangent point along each direction
         #
@@ -113,12 +114,12 @@ class Worker:
         far_dists = self.dists[far_idxs]
         far_dists[far_idxs == -1] = np.nan
         Rgal = kd_utils.calc_Rgal(
-            self.glong, far_dists.T, R0=params['R0']).T
+            self.glong, self.glat, far_dists.T, R0=params['R0']).T
         Rtan = kd_utils.calc_Rgal(
-            self.glong, tan_dists.T, R0=params['R0']).T
+            self.glong, self.glat, tan_dists.T, R0=params['R0']).T
         return (tan_dists, near_dists, far_dists, vlsr_tan, Rgal, Rtan)
 
-def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
+def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
                 rotcurve='reid19_rotcurve',
                 dist_res=0.001, dist_min=0.001, dist_max=30.,
                 resample=False, size=1):
@@ -128,8 +129,8 @@ def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
     a given rotation curve.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg). If it is an array, it must have the
+      glong, glat :: scalar or array of scalars
+        Galactic longitude and latitude (deg). If it is an array, it must have the
         same shape as velo.
 
       velo :: scalar or array of scalars
@@ -200,13 +201,14 @@ def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
     #
     # convert scalar to array if necessary
     input_scalar = np.isscalar(glong)
-    glong, velo = np.atleast_1d(glong, velo)
+    glong, glat, velo = np.atleast_1d(glong, glat, velo)
     inp_shape = glong.shape
     glong = glong.flatten()
+    glat = glat.flatten()
     velo = velo.flatten()
     # check shape of inputs
-    if glong.shape != velo.shape:
-        raise ValueError("glong and velo must have same shape")
+    if glong.shape != velo.shape or glong.shape != glat.shape:
+        raise ValueError("glong, glat, and velo must have same shape")
     if (velo_err is not None and not np.isscalar(velo_err)):
         velo_err = velo_err.flatten()
         if velo_err.shape != velo.shape:
@@ -230,7 +232,7 @@ def rotcurve_kd(glong, velo, velo_err=None, velo_tol=0.1,
     #
     # Initialize worker
     #
-    worker = Worker(glong, velo, velo_err, dists, glong_grid, dist_grid,
+    worker = Worker(glong, glat, velo, velo_err, dists, glong_grid, dist_grid,
                     velo_tol, rotcurve, resample, size)
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))

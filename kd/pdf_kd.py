@@ -42,7 +42,7 @@ def calc_hpd_wrapper(args):
     """
     return calc_hpd(args[0], args[1], alpha=args[2], pdf_bins=args[3])
 
-def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
+def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
            rotcurve_dist_res=0.001, rotcurve_dist_max=30.,
            pdf_bins=1000, num_samples=10000,
            plot_pdf=False, plot_prefix='pdf_'):
@@ -55,8 +55,8 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
     credible interval (BCI) are returned.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg).
+      glong, glat :: scalar or array of scalars
+        Galactic longitude and latitude (deg).
 
       velo :: scalar or array of scalars
         LSR velocity (km/s).
@@ -169,7 +169,7 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
     # Calculate rotcurve kinematic distance
     #
     kd_out = rotcurve_kd(
-        glong, velo, velo_err=velo_err, velo_tol=0.1,
+        glong, glat, velo, velo_err=velo_err, velo_tol=0.1,
         rotcurve=rotcurve, dist_res=rotcurve_dist_res, dist_min=0.01,
         dist_max=rotcurve_dist_max, resample=True, size=num_samples)
     #
@@ -213,7 +213,7 @@ def pdf_kd(glong, velo, velo_err=None, rotcurve='reid19_rotcurve',
             # Compute "traditional" kinematic distances
             #
             rot_kd = rotcurve_kd(
-                glong[i], velo[i], rotcurve=rotcurve,
+                glong[i], glat[i], velo[i], rotcurve=rotcurve,
                 dist_res=rotcurve_dist_res,
                 dist_max=rotcurve_dist_max)
             kdtypes = ["Rgal", "Rtan", "near", "far", "tangent"]

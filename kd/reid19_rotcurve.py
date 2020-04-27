@@ -3,7 +3,8 @@
 reid19_rotcurve.py
 
 Utilities involving the Universal Rotation Curve (Persic+1996) from
-Reid+2019, with re-done analysis by Wenger+2020.
+Reid+2019, with re-done analysis by Wenger+2020. Including HMSFR
+peculiar motion.
 
 Copyright(C) 2017-2020 by
 Trey V. Wenger; tvwenger@gmail.com
@@ -32,11 +33,25 @@ import numpy as np
 from kd import kd_utils
 
 #
-# Reid+2019 A5 rotation curve parameters
+# Reid+2019 A5 rotation model parameters
 #
+__R0 = 8.15
+__Usun = 10.6
+__Vsun = 10.7
+__Wsun = 7.6
+__Upec = 6.0
+__Vpec = -4.3
 __a2 = 0.96
 __a3 = 1.62
-__R0 = 8.15
+__Zsun = 5.5
+__roll = 0.0
+
+#
+# IAU defined LSR
+#
+__Ustd = 10.27
+__Vstd = 15.32
+__Wstd = 7.74
 
 def nominal_params():
     """
@@ -51,7 +66,8 @@ def nominal_params():
           The nominal rotation curve parameter
     """
     params = {
-        'a2': __a2, 'a3': __a3, 'R0': __R0}
+        'R0': __R0, 'Usun': __Usun, 'Vsun': __Vsun, 'Wsun': __Wsun,
+        'Upec': __Upec, 'Vpec': __Vpec, 'a2': __a2, 'a3': __a3}
     return params
 
 def resample_params(size=None):
@@ -77,13 +93,17 @@ def resample_params(size=None):
     if size is None:
         samples = kde['full'].resample(1)
         params = {
-            'a2': samples[6][0], 'a3': samples[7][0],
-            'R0': samples[0][0]}
+            'R0': samples[0][0], 'Usun': samples[1][0],
+            'Vsun': samples[2][0], 'Wsun': samples[3][0],
+            'Upec': samples[4][0], 'Vpec': samples[5][0],
+            'a2': samples[6][0], 'a3': samples[7][0]}
     else:
         samples = kde['full'].resample(size)
         params = {
-            'a2': samples[6], 'a3': samples[7],
-            'R0': samples[0]}
+            'R0': samples[0], 'Usun': samples[1],
+            'Vsun': samples[2], 'Wsun': samples[3],
+            'Upec': samples[4], 'Vpec': samples[5],
+            'a2': samples[6], 'a3': samples[7]}
     return params
 
 def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
@@ -130,35 +150,53 @@ def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
         return theta[0]
     return theta
 
-def calc_vlsr(glong, dist, a2=__a2, a3=__a3, R0=__R0):
+def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
+              Wsun=__Wsun, Upec=__Upec, Vpec=__Vpec, a2=__a2, a3=__a3,
+              Zsun=__Zsun, roll=__roll, peculiar=False):
     """
-    Return the LSR velocity at a given Galactic longitude and
+    Return the IAU-LSR velocity at a given Galactic longitude and
     line-of-sight distance.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg).
+      glong, glat :: scalars or arrays of scalars
+        Galactic longitude and latitude (deg).
 
       dist :: scalar or array of scalars
         line-of-sight distance (kpc).
 
-      a2, a3 :: scalars (optional)
-        Reid+2019 rotation curve parameters
-
       R0 :: scalar (optional)
         Solar Galactocentric radius (kpc)
+
+      Usun, Vsun, Wsun, Upec, Vpec, a2, a3 :: scalars (optional)
+        Reid+2019 rotation curve parameters
+
+      Zsun :: scalar (optional)
+        Height of sun above Galactic midplane (pc)
+
+      roll :: scalar (optional)
+        Roll of Galactic midplane relative to b=0 (deg)
+
+      peculiar :: boolean (optional)
+        If True, include HMSFR peculiar motion component
 
     Returns: vlsr
       vlsr :: scalar or array of scalars
         LSR velocity (km/s).
     """
-    input_scalar = np.isscalar(glong) and np.isscalar(dist)
-    glong, dist = np.atleast_1d(glong, dist)
+    input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
+    glong, glat, dist = np.atleast_1d(glong, glat, dist)
+    cos_glong = np.cos(np.deg2rad(glong))
+    sin_glong = np.sin(np.deg2rad(glong))
+    cos_glat = np.cos(np.deg2rad(glat))
+    sin_glat = np.sin(np.deg2rad(glat))
     #
-    # Convert distance to Galactocentric radius, catch small Rgal
+    # Convert distance to Galactocentric, catch small Rgal
     #
-    Rgal = kd_utils.calc_Rgal(glong, dist, R0=R0)
+    Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
     Rgal[Rgal < 1.e-6] = 1.e-6
+    az = kd_utils.calc_az(glong, glat, dist, R0=R0)
+    cos_az = np.cos(np.deg2rad(az))
+    sin_az = np.sin(np.deg2rad(az))
     #
     # Rotation curve circular velocity
     #
@@ -166,10 +204,46 @@ def calc_vlsr(glong, dist, a2=__a2, a3=__a3, R0=__R0):
         Rgal, a2=a2, a3=a3, R0=R0)
     theta0 = calc_theta(R0, a2=a2, a3=a3, R0=R0)
     #
-    # Now take circular velocity and convert to LSR velocity
+    # Add HMSFR peculiar motion
     #
-    vlsr = R0 * np.sin(np.deg2rad(glong))
-    vlsr = vlsr * ((theta/Rgal) - (theta0/R0))
+    if peculiar:
+        vR = -Upec
+        vAz = theta + Vpec
+        vZ = 0.0
+    else:
+        vR = 0.0
+        vAz = theta
+        vZ = 0.0
+    vXg = -vR*cos_az + vAz*sin_az
+    vYg = vR*sin_az + vAz*cos_az
+    vZg = vZ
+    #
+    # Convert to barycentric
+    #
+    X = dist*cos_glat*cos_glong
+    Y = dist*cos_glat*sin_glong
+    Z = dist*sin_glat
+    # useful constants
+    sin_tilt = Zsun/1000./R0
+    cos_tilt = np.cos(np.arcsin(sin_tilt))
+    sin_roll = np.sin(np.deg2rad(roll))
+    cos_roll = np.cos(np.deg2rad(roll))
+    # solar peculiar motion
+    vXg = vXg - Usun
+    vYg = vYg - theta0 - Vsun
+    vZg = vZg - Wsun
+    # correct tilt and roll of Galactic midplane
+    vXg1 = vXg*cos_tilt - vZg*sin_tilt
+    vYg1 = vYg
+    vZg1 = vXg*sin_tilt + vZg*cos_tilt
+    vXh = vXg1
+    vYh = vYg1*cos_roll + vZg1*sin_roll
+    vZh = -vYg1*sin_roll + vZg1*cos_roll
+    vbary = (X*vXh + Y*vYh + Z*vZh)/dist
+    #
+    # Convert to IAU-LSR
+    #
+    vlsr = vbary + (__Ustd*cos_glong + __Vstd*sin_glong)*cos_glat + __Wsun*sin_glat
     if input_scalar:
         return vlsr[0]
     return vlsr

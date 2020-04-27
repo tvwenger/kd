@@ -48,14 +48,14 @@ __Usun = 10.6 # km/s
 __Vsun = 10.7 # km/s
 __Wsun = 7.6 # km/s
 
-def calc_Rgal(glong, dist, R0=__R0):
+def calc_Rgal(glong, glat, dist, R0=__R0):
     """
     Return the Galactocentric radius of an object with a given
-    Galacitic longitude and distance.
+    Galacitic longitude, latitude, and distance.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg).
+      glong, glat :: scalars or arrays of scalars
+        Galactic longitude and latitude (deg).
 
       dist :: scalar or array of scalars
         line-of-sight distance (kpc).
@@ -70,21 +70,22 @@ def calc_Rgal(glong, dist, R0=__R0):
     #
     # law of cosines
     #
-    Rgal2 = R0**2. + dist**2.
-    Rgal2 = Rgal2 - 2.*R0*dist*np.cos(np.deg2rad(glong))
+    dist_cos_glat = dist*np.cos(np.deg2rad(glat))
+    Rgal2 = R0**2. + dist_cos_glat**2.
+    Rgal2 = Rgal2 - 2.*R0*dist_cos_glat*np.cos(np.deg2rad(glong))
     Rgal = np.sqrt(Rgal2)
     return Rgal
 
-def calc_az(glong, dist, R0=__R0):
+def calc_az(glong, glat, dist, R0=__R0):
     """
     Return the Galactocentric azimuth of an object with a given
-    Galacitic longitude and distance. Galactocentric azimuth is
-    defined as zero in the direction of the Sun and increasing
-    in the direction of the Solar orbit direction.
+    Galacitic longitude, latitude, and distance. Galactocentric
+    azimuth is defined as zero in the direction of the Sun and
+    increasing in the direction of the Solar orbit.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg).
+      glong, glat :: scalars or arrays of scalars
+        Galactic longitude and latitude (deg).
 
       dist :: scalar or array of scalars
         line-of-sight distance (kpc).
@@ -95,19 +96,21 @@ def calc_az(glong, dist, R0=__R0):
     Returns: az
       az :: scalar or array of scalars
         Galactocentric azimuth (degs).
+
     """
-    input_scalar = np.isscalar(glong) and np.isscalar(dist)
-    glong, dist = np.atleast_1d(glong, dist)
+    input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
+    glong, glat, dist = np.atleast_1d(glong, glat, dist)
     # ensure longitude range [0,360) degrees
     glong = glong % 360.
     #
     # Compute Rgal
     #
-    Rgal = calc_Rgal(glong, dist, R0=R0)
+    Rgal = calc_Rgal(glong, glat, dist, R0=R0)
     #
     # law of cosines
     #
-    cos_az = (R0**2. + Rgal**2. - dist**2.)/(2.*Rgal*R0)
+    dist_cos_glat = dist*np.cos(np.deg2rad(glat))
+    cos_az = (R0**2. + Rgal**2. - dist_cos_glat**2.)/(2.*Rgal*R0)
     #
     # Catch fringe cases
     #
@@ -122,10 +125,10 @@ def calc_az(glong, dist, R0=__R0):
         return az[0]
     return az
 
-def calc_dist(az, Rgal, R0=__R0):
+def calc_dist(az, Rgal, Z, R0=__R0):
     """
     Return the line-of-sight distance of an object with a given
-    Galactocentric azimuth and radius.
+    Galactocentric azimuth, radius, and height above the plane.
 
     Parameters:
       az :: scalar or array of scalars
@@ -133,6 +136,9 @@ def calc_dist(az, Rgal, R0=__R0):
 
       Rgal :: scalar or array of scalars
         Galactocentric radius (kpc).
+
+      Z :: scalar or array of scalars
+        Height above the plane
 
       R0 :: scalar (optional)
         Galactocentric radius of the Sun.
@@ -144,8 +150,7 @@ def calc_dist(az, Rgal, R0=__R0):
     #
     # law of cosines
     #
-    dist2 = R0**2. +Rgal**2.
-    dist2 = dist2 - 2.*R0*Rgal*np.cos(np.deg2rad(az))
+    dist2 = R0**2. + Rgal**2. + Z**2. - 2.*R0*Rgal*np.cos(np.deg2rad(az))
     dist = np.sqrt(dist2)
     return dist
 
@@ -154,7 +159,7 @@ def calc_glong(az, Rgal, R0=__R0):
     Return the Galactic longitude of an object with a given
     Galacitocentric azimuth and radius. Galactic longitude is
     defined as zero in the direction of the Galactic Center and
-    increasing in the direction of the Solar orbit direction.
+    increasing in the direction of the Solar orbit.
 
     Parameters:
       az :: scalar or array of scalars
@@ -162,6 +167,9 @@ def calc_glong(az, Rgal, R0=__R0):
 
       Rgal :: scalar or array of scalars
         Galactocentric radius (kpc).
+
+      Z :: scalar or array of scalars
+        Height above the plane
 
       R0 :: scalar (optional)
         Galactocentric radius of the Sun.
@@ -175,9 +183,9 @@ def calc_glong(az, Rgal, R0=__R0):
     # ensure azimuth range [0,360) degrees
     az = az % 360.
     #
-    # Compute line of sight distance
+    # Compute midplane distance
     #
-    dist = calc_dist(az, Rgal, R0=R0)
+    dist = calc_dist(az, Rgal, 0., R0=R0)
     #
     # law of cosines
     #
