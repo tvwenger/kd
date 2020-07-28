@@ -33,14 +33,15 @@ from kd import kd_utils
 #
 # Reid+2014 rotation curve parameters and uncertainties
 #
-__a1 = 241. # km/s V(R_opt)
+__a1 = 241.  # km/s V(R_opt)
 __a1_err = 8.
-__a2 = 0.90 # R_opt/ R0
+__a2 = 0.90  # R_opt/ R0
 __a2_err = 0.06
-__a3 = 1.46 # 1.5*(L/L*)^0.2
+__a3 = 1.46  # 1.5*(L/L*)^0.2
 __a3_err = 0.16
-__R0 = 8.34 # kpc
+__R0 = 8.34  # kpc
 __R0_err = 0.16
+
 
 def nominal_params():
     """
@@ -57,6 +58,7 @@ def nominal_params():
     params = {
         'a1': __a1, 'a2': __a2, 'a3': __a3, 'R0': __R0}
     return params
+
 
 def resample_params(size=None):
     """
@@ -79,6 +81,7 @@ def resample_params(size=None):
         'a3': np.random.normal(loc=__a3, scale=__a3_err, size=size),
         'R0': np.random.normal(loc=__R0, scale=__R0_err, size=size)}
     return params
+
 
 def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     """
@@ -123,14 +126,15 @@ def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
         return theta[0]
     return theta
 
-def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
+
+def calc_vlsr(glong, glat, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     """
     Return the LSR velocity at a given Galactic longitude and
     line-of-sight distance.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg).
+      glong, glat :: scalar or array of scalars
+        Galactic longitude and latitude (deg).
 
       dist :: scalar or array of scalars
         line-of-sight distance (kpc).
@@ -145,12 +149,12 @@ def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
       vlsr :: scalar or array of scalars
         LSR velocity (km/s).
     """
-    input_scalar = np.isscalar(glong) and np.isscalar(dist)
-    glong, dist = np.atleast_1d(glong, dist)
+    input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
+    glong, glat, dist = np.atleast_1d(glong, glat, dist)
     #
     # Convert distance to Galactocentric radius, catch small Rgal
     #
-    Rgal = kd_utils.calc_Rgal(glong, dist, R0=R0)
+    Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
     Rgal[Rgal < 1.e-6] = 1.e-6
     #
     # Rotation curve circular velocity
