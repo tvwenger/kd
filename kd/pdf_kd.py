@@ -103,6 +103,9 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
       output["far"] :: scalar or array of scalars
         kinematic far distance (kpc)
 
+      output["distance"] :: scalar or array of scalars
+        kinematic distance (near and far combined) (kpc)
+
       output["tangent"] :: scalar or array of scalars
         kinematic tangent distance (kpc)
 
@@ -126,7 +129,7 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
     #
     # check shape of inputs
     input_scalar = np.isscalar(glong)
-    glong, velo = np.atleast_1d(glong, velo)
+    glong, glat, velo = np.atleast_1d(glong, glat, velo)
     if glong.shape != velo.shape:
         raise ValueError("glong and velo must have same shape")
     if (velo_err is not None and not np.isscalar(velo_err) and
@@ -155,6 +158,11 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
                                    dtype=object),
                "far_err_neg": np.zeros(glong.shape),
                "far_err_pos": np.zeros(glong.shape),
+               "distance": np.zeros(glong.shape),
+               "distance_kde": np.empty(shape=glong.shape,
+                                       dtype=object),
+               "distance_err_neg": np.zeros(glong.shape),
+               "distance_err_pos": np.zeros(glong.shape),
                "tangent": np.zeros(glong.shape),
                "tangent_kde": np.empty(shape=glong.shape,
                                        dtype=object),
@@ -182,12 +190,25 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
         for i in np.ndindex(glong.shape):
             args.append((
                 kd_out[kdtype][i], kdetype, 0.683, pdf_bins))
-    with mp.Pool() as pool:
-        kde_results = pool.map(calc_hpd_wrapper, args)
+    #
+    # Also, distance (near + far)
+    # check if both are nan -> use tangent distance
+    #
+    kdtypes += ["distance"]
+    kdetypes += ["pyqt"]
+    for i in np.ndindex(glong.shape):
+        is_tangent = np.isnan(kd_out['near'][i])*np.isnan(kd_out['far'][i])
+        samples = kd_out['tangent'][i][is_tangent]
+        samples = np.concatenate((
+            samples, kd_out['near'][i][~is_tangent],
+            kd_out['far'][i][~is_tangent]))
+        args.append((samples, 'pyqt', 0.683, pdf_bins))
     #
     # Get results
     #
     nresult = 0
+    with mp.Pool() as pool:
+        kde_results = pool.map(calc_hpd_wrapper, args)
     for kdtype, kdetype in zip(kdtypes, kdetypes):
         for i in np.ndindex(glong.shape):
             kde, mode, lower, upper = kde_results[nresult]
@@ -204,7 +225,7 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
             #
             # Set-up figure
             #
-            fig, axes = plt.subplots(5, figsize=(8.5, 11))
+            fig, axes = plt.subplots(6, figsize=(8.5, 11))
             axes[0].set_title(
                 r"PDFs for ($\ell$, $v$) = ("
                 "{0:.1f}".format(glong[i])+r"$^\circ$, "
@@ -216,12 +237,19 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
                 glong[i], glat[i], velo[i], rotcurve=rotcurve,
                 dist_res=rotcurve_dist_res,
                 dist_max=rotcurve_dist_max)
-            kdtypes = ["Rgal", "Rtan", "near", "far", "tangent"]
+            kdtypes = ["Rgal", "Rtan", "near", "far", "distance", "tangent"]
             labels = [r"$R$ (kpc)", r"$R_{\rm tan}$ (kpc)",
                       r"$d_{\rm near}$ (kpc)", r"$d_{\rm far}$ (kpc)",
-                      r"$d_{\rm tan}$ (kpc)"]
+                      r"$d$ (kpc)", r"$d_{\rm tan}$ (kpc)"]
             for ax, kdtype, label in zip(axes, kdtypes, labels):
-                out = kd_out[kdtype][i]
+                if kdtype == 'distance':
+                    is_tangent = np.isnan(kd_out['near'][i])*np.isnan(kd_out['far'][i])
+                    out = kd_out['tangent'][i][is_tangent]
+                    out = np.concatenate((
+                        out, kd_out['near'][i][~is_tangent],
+                        kd_out['far'][i][~is_tangent]))
+                else:
+                    out = kd_out[kdtype][i]
                 peak = results[kdtype][i]
                 kde = results[kdtype+"_kde"][i]
                 err_neg = results[kdtype+"_err_neg"][i]
@@ -252,9 +280,15 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
                 ax.axvline(
                     peak, linestyle='solid',
                     color='k', zorder=3)
-                ax.axvline(
-                    rot_kd[kdtype], linestyle='dashed',
-                    color='k', zorder=3)
+                if kdtype == 'distance':
+                    ax.axvline(rot_kd['near'], linestyle='dashed',
+                               color='k', zorder=3)
+                    ax.axvline(rot_kd['far'], linestyle='dashed',
+                               color='k', zorder=3)
+                else:
+                    ax.axvline(
+                        rot_kd[kdtype], linestyle='dashed',
+                        color='k', zorder=3)
                 ax.set_xlabel(label)
                 ax.set_ylabel("Normalized PDF")
                 ax.set_xlim(np.min(out), np.max(out))
