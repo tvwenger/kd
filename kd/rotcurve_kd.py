@@ -38,7 +38,8 @@ class Worker:
     Multiprocessing wrapper class
     """
     def __init__(self, glong, glat, velo, velo_err, dists, glong_grid,
-                 dist_grid, velo_tol, rotcurve, resample, size):
+                 dist_grid, velo_tol, rotcurve, resample, size,
+                 peculiar, use_kriging):
         self.glong = glong
         self.glat = glat
         self.velo = velo
@@ -49,6 +50,9 @@ class Worker:
         self.velo_tol = velo_tol
         self.resample = resample
         self.size = size
+        self.rotcurve = rotcurve
+        self.peculiar = peculiar
+        self.use_kriging = use_kriging
         #
         # Get rotation curve module
         #
@@ -56,7 +60,14 @@ class Worker:
         #
         # Get nominal rotation curve parameters
         #
-        self.nominal_params = self.rotcurve_module.nominal_params()
+        if rotcurve == "cw21_rotcurve":
+            self.nominal_params = self.rotcurve_module.nominal_params(
+              glong=glong, glat=glat, dist=dists, use_kriging=use_kriging)
+        elif not use_kriging:
+            # if rotcurve == "reid19_rotcurve":
+            self.nominal_params = self.rotcurve_module.nominal_params()
+        else:
+            raise ValueError("kriging is only supported for 'cw21_rotcurve'")
 
     def work(self, snum):
         #
@@ -67,8 +78,13 @@ class Worker:
         # Resample velocity and rotation curve parameters
         #
         if self.resample:
-            params = self.rotcurve_module.resample_params(
-                size=len(self.glong))
+            if self.rotcurve == "cw21_rotcurve":
+                params = self.rotcurve_module.resample_params(
+                  size=len(self.glong), glong=self.glong, glat=self.glat,
+                  dist=self.dists, use_kriging=self.use_kriging)
+            else:
+                params = self.rotcurve_module.resample_params(
+                    size=len(self.glong))
             velo_sample = np.random.normal(
                 loc=self.velo, scale=self.velo_err)
         else:
@@ -77,8 +93,15 @@ class Worker:
         #
         # Calculate LSR velocity at each (glong, distance) point
         #
-        grid_vlsrs = self.rotcurve_module.calc_vlsr(
-            self.glong_grid, self.glat, self.dist_grid, **params)
+        # ? Check following code works with kriging.
+        # ? Might need to transpose Upec, etc. Should be okay?
+        if self.rotcurve == "reid19_rotcurve" or self.rotcurve == "cw21.rotcurve":
+            grid_vlsrs = self.rotcurve_module.calc_vlsr(
+                self.glong_grid, self.glat, self.dist_grid,
+                peculiar=self.peculiar, **params)
+        else:
+            grid_vlsrs = self.rotcurve_module.calc_vlsr(
+                self.glong_grid, self.glat, self.dist_grid, **params)
         #
         # Get index of tangent point along each direction
         #
@@ -120,9 +143,10 @@ class Worker:
         return (tan_dists, near_dists, far_dists, vlsr_tan, Rgal, Rtan)
 
 def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
-                rotcurve='reid19_rotcurve',
+                rotcurve='cw21_rotcurve',
                 dist_res=0.001, dist_min=0.001, dist_max=30.,
-                resample=False, size=1):
+                resample=False, size=1,
+                peculiar=False, use_kriging=False):
     """
     Return the kinematic near, far, and tanget distance for a
     given Galactic longitude and LSR velocity assuming
@@ -139,7 +163,7 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
 
       velo_err :: scalar or array of scalars (optional)
         LSR velocity uncertainty (km/s). If it is an array, it must
-        have the same shape as velo. Otherwise, this scalar 
+        have the same shape as velo. Otherwise, this scalar
         uncertainty is applied to all velos.
 
       velo_tol :: scalar (optional)
@@ -162,12 +186,21 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
         distance (kpc)
 
       resample :: bool (optional)
-        if True, use resampled rotation curve parameters and LSR 
+        if True, use resampled rotation curve parameters and LSR
         velocities.
 
       size :: integer (optional)
         if resample is True, generate this many samples
-    
+
+      peculiar :: boolean (optional)
+        Only supported for "cw21_rotcurve" and "reid19_rotcurve"
+        If True, include HMSFR peculiar motion component
+
+      use_kriging :: boolean (optional)
+        Only supported for rotcurve = "cw21_rotcurve"
+        If True, estimate individual Upec & Vpec from kriging program
+        If False, use average Upec & Vpec
+
     Returns: output
       output["Rgal"] :: scalar or array of scalars
         Galactocentric radius (kpc).
@@ -233,7 +266,7 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
     # Initialize worker
     #
     worker = Worker(glong, glat, velo, velo_err, dists, glong_grid, dist_grid,
-                    velo_tol, rotcurve, resample, size)
+                    velo_tol, rotcurve, resample, size, peculiar, use_kriging)
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))
     #
