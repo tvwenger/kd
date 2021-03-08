@@ -84,7 +84,9 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
         x, y :: scalar or array of scalars
           Galactocentric Cartesian x- and y-coordinates
     """
+    glong, glat, dist = np.atleast_1d(glong, glat, dist)
     Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
+    Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
     az = kd_utils.calc_az(glong, glat, dist, R0=R0)
 
     x = Rgal * -np.cos(np.deg2rad(az))
@@ -319,7 +321,9 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
             glat = np.array([glat,] * size).T
             dist = np.array([dist,] * size).T
         if np.shape(glong) != np.shape(Upec_avg):
-          raise ValueError("Please ensure glong, glat, and dist are 1D arrays")
+            raise ValueError("Please ensure glong, glat, and dist are 1D arrays" + \
+                             f"\nglong shape: {np.shape(glong)} " + \
+                             f"vs. Upec_avg shape: {np.shape(Upec_avg)}")
         # Calculate galactocentric positions
         x, y = calc_gcen_coords(glong, glat, dist, R0=params["R0"])
         # Calculate individual Upec and Vpec at source location(s)
@@ -372,7 +376,15 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
 #     dist=np.array([2.84, 4.07]),
 #     use_kriging=True,
 # )
-# TODO: check each of the 4 above cases. YES!
+# # The following should fail... (?)
+# resample_params(
+#     size=None,
+#     glong=np.array([[19.36, 36.12],[19.36, 36.12]]),
+#     glat=np.array([[-0.03, 0.55], [-0.03, 0.55]]),
+#     dist=np.array([[2.84, 4.07], [2.84, 4.07]]),
+#     use_kriging=True,
+# )
+# TODO: check each of the above cases. YES!
 # TODO: fix all calls in rotcurve_kd.py. I think it is done...
 # * --- TEST STUFF ---
 # def nominal_params():
