@@ -88,11 +88,13 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
     Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
     Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
     az = kd_utils.calc_az(glong, glat, dist, R0=R0)
+    cos_az = np.cos(np.deg2rad(az))
+    sin_az = np.sin(np.deg2rad(az))
 
-    x = Rgal * -np.cos(np.deg2rad(az))
-    y = Rgal * np.sin(np.deg2rad(az))
+    x = Rgal * -cos_az
+    y = Rgal * sin_az
 
-    return x, y
+    return x, y, Rgal, cos_az, sin_az
 
 
 def krige_UpecVpec(
@@ -193,14 +195,20 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
         If True, estimate individual Upec & Vpec from kriging program
         If False, use average Upec & Vpec
 
-    Returns: params
+    Returns: params, Rgal, cos_az, sin_az
       params :: dictionary
         params['R0'], etc. : scalar
           The nominal rotation curve parameter
+
+      Rgal :: scalar or array of scalars
+        Galactocentric cylindrical radius (kpc)
+
+      cos_az, sin_az :: scalar or array of scalars
+        Cosine and sine of Galactocentric azimuth (rad)
     """
     if use_kriging and glong is not None and glat is not None and dist is not None:
         # Calculate galactocentric positions
-        x, y = calc_gcen_coords(glong, glat, dist, R0=__R0)
+        x, y, Rgal, cos_az, sin_az = calc_gcen_coords(glong, glat, dist, R0=__R0)
         # Calculate individual Upec and Vpec at source location(s)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
             x, y, Upec_avg=__Upec, Vpec_avg=__Vpec,
@@ -211,6 +219,7 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
         Vpec = __Vpec
         Upec_var = __Upec_var
         Vpec_var = __Vpec_var
+        Rgal = cos_az = sin_az = None
 
     params = {
         "R0": __R0,
@@ -226,7 +235,7 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
         "a2": __a2,
         "a3": __a3,
     }
-    return params
+    return params, Rgal, cos_az, sin_az
 
 
 # def printit(dict, **args):
@@ -254,7 +263,7 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
         If True, estimate individual Upec & Vpec from kriging program
         If False, use average Upec & Vpec
 
-    Returns: params
+    Returns: params, Rgal, cos_az, sin_az
       params :: dictionary
         params['R0'], etc. : scalar or array of scalars
                              The re-sampled parameters
@@ -264,6 +273,12 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
               i.e., columns are the same source,
               rows are all n=size samples of one source
             = (size) if # sources == 1
+
+      Rgal :: scalar or array of scalars
+        Galactocentric cylindrical radius (kpc)
+
+      cos_az, sin_az :: scalar or array of scalars
+        Cosine and sine of Galactocentric azimuth (rad)
     """
     # kdefile contains: full KDE + KDEs of each component (e.g. "R0")
     #                   + kriging function + kriging thresholds
@@ -325,7 +340,8 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
                              f"\nglong shape: {np.shape(glong)} " + \
                              f"vs. Upec_avg shape: {np.shape(Upec_avg)}")
         # Calculate galactocentric positions
-        x, y = calc_gcen_coords(glong, glat, dist, R0=params["R0"])
+        x, y, Rgal, cos_az, sin_az = calc_gcen_coords(
+            glong, glat, dist, R0=params["R0"])
         # Calculate individual Upec and Vpec at source location(s)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
             x, y, Upec_avg=Upec_avg, Vpec_avg=Vpec_avg,
@@ -355,7 +371,9 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
         # print(params["Vpec"])
         # print(np.sqrt(params["Vpec_var"]))
         # printit(params, **params)
-    return params
+    else:
+        Rgal = cos_az = sin_az = None
+    return params, Rgal, cos_az, sin_az
 
 
 # * --- TEST STUFF ---
@@ -462,7 +480,8 @@ def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
     return theta
 
 
-def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
+def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
+              R0=__R0, Usun=__Usun, Vsun=__Vsun,
               Wsun=__Wsun, Upec=__Upec, Vpec=__Vpec, a2=__a2, a3=__a3,
               Zsun=__Zsun, roll=__roll, peculiar=False):
     """
@@ -475,6 +494,12 @@ def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
 
       dist :: scalar or array of scalars
         line-of-sight distance (kpc).
+
+      Rgal :: scalar or array of scalars (optional)
+        Galactocentric cylindrical radius (kpc).
+
+      cos_az, sin_az :: scalar or array of scalars (optional)
+        Cosine and sine of Galactocentric azimuth (rad).
 
       R0 :: scalar (optional)
         Solar Galactocentric radius (kpc)
@@ -502,13 +527,13 @@ def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
     cos_glat = np.cos(np.deg2rad(glat))
     sin_glat = np.sin(np.deg2rad(glat))
     #
-    # Convert distance to Galactocentric, catch small Rgal
-    #
-    Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
-    Rgal[Rgal < 1.0e-6] = 1.0e-6
-    az = kd_utils.calc_az(glong, glat, dist, R0=R0)
-    cos_az = np.cos(np.deg2rad(az))
-    sin_az = np.sin(np.deg2rad(az))
+    if Rgal is None or cos_az is None or sin_az is None:
+        # Convert distance to Galactocentric, catch small Rgal
+        Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
+        Rgal[Rgal < 1.0e-6] = 1.0e-6
+        az = kd_utils.calc_az(glong, glat, dist, R0=R0)
+        cos_az = np.cos(np.deg2rad(az))
+        sin_az = np.sin(np.deg2rad(az))
     #
     # Rotation curve circular velocity
     #
@@ -518,21 +543,6 @@ def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
     # Add HMSFR peculiar motion
     #
     if peculiar:
-        # if use_kriging:
-        #     # Find galactocentric Cartesian coordinates
-        #     gcen_x = Rgal * -cos_az
-        #     gcen_y = Rgal * sin_az
-        #     # Estimate peculiar velocities from kriging
-        #     Upec_krige, Upec_krige_var, Vpec_krige, Vpec_krige_var = krige_UpecVpec(
-        #         gcen_x, gcen_y, Upec_avg=Upec, Vpec_avg=Vpec
-        #     )
-        #     vR = -Upec_krige
-        #     vAz = theta + Vpec_krige
-        #     vZ = 0.0
-        # else:
-        #     vR = -Upec
-        #     vAz = theta + Vpec
-        #     vZ = 0.0
         vR = -Upec
         vAz = theta + Vpec
         vZ = 0.0
