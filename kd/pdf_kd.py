@@ -42,10 +42,11 @@ def calc_hpd_wrapper(args):
     """
     return calc_hpd(args[0], args[1], alpha=args[2], pdf_bins=args[3])
 
-def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
+def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
            rotcurve_dist_res=0.001, rotcurve_dist_max=30.,
            pdf_bins=1000, num_samples=10000,
-           plot_pdf=False, plot_prefix='pdf_'):
+           plot_pdf=False, plot_prefix='pdf_',
+           peculiar=False, use_kriging=False):
     """
     Return the kinematic near, far, and tanget distance and distance
     uncertainties for a given Galactic longitude and LSR velocity
@@ -74,7 +75,7 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
         distance with rotcurve_kd (kpc)
 
       rotcurve_dist_max :: scalar (optional)
-        maximum line-of-sight distance when calculating kinematic 
+        maximum line-of-sight distance when calculating kinematic
         distance with rotcurve_kd (kpc)
 
       pdf_bins :: integer (optional)
@@ -89,6 +90,15 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
 
       plot_prefix :: string (optional)
         The prefix for the plot filenames.
+
+      peculiar :: boolean (optional)
+        Only supported for "cw21_rotcurve" and "reid19_rotcurve"
+        If True, include HMSFR peculiar motion component
+
+      use_kriging :: boolean (optional)
+        Only supported for rotcurve = "cw21_rotcurve"
+        If True, estimate individual Upec & Vpec from kriging program
+        If False, use average Upec & Vpec
 
     Returns: output
       output["Rgal"] :: scalar or array of scalars
@@ -179,7 +189,8 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='reid19_rotcurve',
     kd_out = rotcurve_kd(
         glong, glat, velo, velo_err=velo_err, velo_tol=0.1,
         rotcurve=rotcurve, dist_res=rotcurve_dist_res, dist_min=0.01,
-        dist_max=rotcurve_dist_max, resample=True, size=num_samples)
+        dist_max=rotcurve_dist_max, resample=True, size=num_samples,
+        peculiar=peculiar, use_kriging=use_kriging)
     #
     # Set up multiprocessing for fitting KDEs
     #
