@@ -283,6 +283,11 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
                     velo_tol, rotcurve, resample, size, peculiar, use_kriging)
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))
+    # Free memory even though pool should be closed already
+    # ! Does not help whether it is inside or outside context manager
+    print("Closing pool")
+    pool.close()
+    pool.join()
     #
     # Store results
     #

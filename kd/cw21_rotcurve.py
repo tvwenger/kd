@@ -64,6 +64,17 @@ __Ustd = 10.27
 __Vstd = 15.32
 __Wstd = 7.74
 
+# Open statement outside function does not help reduce memory usage
+# and I have to call it inside the function anyway
+# # krigefile contains: full KDE + KDEs of each component (e.g. "R0", "Zsun", etc.)
+# #                     + kriging function + kriging thresholds
+# krigefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
+# with open(krigefile, "rb") as f:
+#     file = dill.load(f)
+#     krige = file["krige"]
+#     Upec_var_threshold = file["Upec_var_threshold"]
+#     Vpec_var_threshold = file["Vpec_var_threshold"]
+
 
 def calc_gcen_coords(glong, glat, dist, R0=__R0):
     """
@@ -346,7 +357,7 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
         }
 
     if use_kriging and glong is not None and glat is not None and dist is not None:
-        print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
+        # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
         # print(np.shape(params["Upec"]))
 
         # if np.size(glong) == 1 and np.size(glat) == 1 and np.size(dist) == 1:
