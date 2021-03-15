@@ -49,9 +49,9 @@ __Usun = 10.879
 __Vsun = 10.697
 __Wsun = 8.088
 __Upec = 4.907
-__Upec_var = 1.7  # * UPDATE. variance of __Upec
+__Upec_var = 16.9  # * UPDATE. variance of __Upec
 __Vpec = -4.522
-__Vpec_var = 33.8  # * UPDATE. variance of __Vpec
+__Vpec_var = 34.3  # * UPDATE. variance of __Vpec
 __a2 = 0.977
 __a3 = 1.626
 __Zsun = 5.399
@@ -154,6 +154,7 @@ def krige_UpecVpec(
 
     # Calculate expected Upec and Vpec at source location(s)
     Upec, Upec_var, Vpec, Vpec_var = krige(x, y)
+    # print("kriging results:", Upec, Upec_var, Vpec, Vpec_var)
     # print("krige_UpecVpec, Upec before reshape:", np.shape(Upec))
     Upec = Upec.reshape(np.shape(x))
     Upec_var = Upec_var.reshape(np.shape(x))
@@ -196,6 +197,8 @@ def krige_UpecVpec(
         Vpec[Vpec_mask] = Vpec_avg
         Upec_var[Upec_mask] = var_Upec_avg
         Vpec_var[Vpec_mask] = var_Vpec_avg
+
+    # print("Final kriging results:", Upec, Upec_var, Vpec, Vpec_var)
 
     return Upec, Upec_var, Vpec, Vpec_var
 
@@ -343,7 +346,7 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
         }
 
     if use_kriging and glong is not None and glat is not None and dist is not None:
-        # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
+        print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
         # print(np.shape(params["Upec"]))
 
         # if np.size(glong) == 1 and np.size(glat) == 1 and np.size(dist) == 1:
@@ -522,7 +525,7 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
               R0=__R0, Usun=__Usun, Vsun=__Vsun,
               Wsun=__Wsun, Upec=__Upec, Upec_var=__Upec_var,
               Vpec=__Vpec, Vpec_var=__Vpec_var, a2=__a2, a3=__a3,
-              Zsun=__Zsun, roll=__roll, peculiar=False):
+              Zsun=__Zsun, roll=__roll, peculiar=False, use_kriging=False):
     """
     Return the IAU-LSR velocity at a given Galactic longitude and
     line-of-sight distance.
@@ -626,6 +629,15 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vlsr = (
         vbary + (__Ustd * cos_glong + __Vstd * sin_glong) * cos_glat + __Wsun * sin_glat
     )
+    if use_kriging and np.shape(vlsr)[1] > 1:
+        # vlsr = np.median(vlsr, axis=1)[:, np.newaxis]
+        # print("vlsr", np.shape(vlsr))
+        # print(vlsr[0:10, 0:10])
+        vlsr = vlsr[0]
+        vlsr = vlsr[:, np.newaxis]
+    # print("vlsr", np.shape(vlsr))
+    # print("vlsr[0]", vlsr[0])
+    # print("vlsr[1:10]", vlsr[1:10])
     if input_scalar:
         return vlsr[0]
     return vlsr

@@ -108,7 +108,7 @@ class Worker:
                 # ? TAKES UP TOO MUCH MEMORY!?!?!
                 # ? MAYBE KRIGING ITSELF?
                 Rgal=Rgal, cos_az=cos_az, sin_az=sin_az,
-                peculiar=self.peculiar, **params)
+                peculiar=self.peculiar, use_kriging=self.use_kriging, **params)
         elif self.rotcurve == "reid19_rotcurve":
             grid_vlsrs = self.rotcurve_module.calc_vlsr(
                 self.glong_grid, self.glat, self.dist_grid,

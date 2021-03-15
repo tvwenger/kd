@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 2017-04-12 Trey V. Wenger
 2018-01-17 Trey V. Wenger removed multiprocessing. The overhead
   of multiprocessing dominated the computation time.
-2020-02-20 Trey V. Wener updates for v2.0
+2020-02-20 Trey V. Wenger updates for v2.0
 """
 
 import numpy as np

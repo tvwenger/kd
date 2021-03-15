@@ -12,7 +12,8 @@ peculiar=True
 use_kriging=True
 dist = pdf_kd.pdf_kd(
     glong, glat, velo, velo_err=velo_err, rotcurve=rotcurve, num_samples=num_samples,
-    peculiar=peculiar, use_kriging=use_kriging
+    peculiar=peculiar,
+    # use_kriging=use_kriging
 )
 print(dist)
 
@@ -23,7 +24,10 @@ print(dist)
 # velo = 20.0  # measured LSR velocity, km/s
 # velo_tol = 0.1  # tolerance to determine a "match" between rotation curve and measured LSR velocity (km/s)
 # rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
-# dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve, peculiar=True)
+# dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
+#                             #    peculiar=True,
+#                                use_kriging=True
+#                                )
 # print(dist)
 
 
