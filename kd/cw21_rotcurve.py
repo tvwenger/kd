@@ -158,6 +158,7 @@ def krige_UpecVpec(
         krige = file["krige"]
         Upec_var_threshold = file["Upec_var_threshold"]
         Vpec_var_threshold = file["Vpec_var_threshold"]
+        file = None
 
     # Switch to convention used in kriging map
     # (Rotate 90 deg CW, Sun is on +y-axis)
@@ -210,6 +211,7 @@ def krige_UpecVpec(
         Vpec_var[Vpec_mask] = var_Vpec_avg
 
     # print("Final kriging results:", Upec, Upec_var, Vpec, Vpec_var)
+    krige = Upec_var_threshold = Vpec_var_threshold = None
 
     return Upec, Upec_var, Vpec, Vpec_var
 
@@ -273,6 +275,7 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
         "a2": __a2,
         "a3": __a3,
     }
+    # print(np.shape(params["Upec"]))
     return params, Rgal, cos_az, sin_az
 
 
@@ -355,6 +358,7 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
             "a2": samples[8],
             "a3": samples[9],
         }
+    kde = None
 
     if use_kriging and glong is not None and glat is not None and dist is not None:
         # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
@@ -425,6 +429,8 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
         # printit(params, **params)
     else:
         Rgal = cos_az = sin_az = None
+
+    # print("Resample_params final Upec shape:", np.shape(params["Upec"]))
     return params, Rgal, cos_az, sin_az
 
 

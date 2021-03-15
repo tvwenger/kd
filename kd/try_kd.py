@@ -1,34 +1,34 @@
-# from kd import pdf_kd
+from kd import pdf_kd
 
-# # ! FIX KRIGING IN cw21_rotcurve
-# # ! USING TOO MUCH MEMORY WITH KRIGING!
-# glong = 30.0  # Galactic longitude, degrees
-# glat = 1.0  # Galactic latitude, degrees
-# velo = 20.0  # measured LSR velocity, km/s
-# velo_err = 5.0  # measured LSR velocity uncertainty, km/s
-# rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
-# num_samples = 2  # number of re-samples
-# peculiar=True
-# use_kriging=True
-# dist = pdf_kd.pdf_kd(
-#     glong, glat, velo, velo_err=velo_err, rotcurve=rotcurve, num_samples=num_samples,
-#     peculiar=peculiar,
-#     # use_kriging=use_kriging
-# )
-# print(dist)
-
-from kd import rotcurve_kd
-
+# ! FIX KRIGING IN cw21_rotcurve
+# ! USING TOO MUCH MEMORY WITH KRIGING!
 glong = 30.0  # Galactic longitude, degrees
 glat = 1.0  # Galactic latitude, degrees
 velo = 20.0  # measured LSR velocity, km/s
-velo_tol = 0.1  # tolerance to determine a "match" between rotation curve and measured LSR velocity (km/s)
+velo_err = 5.0  # measured LSR velocity uncertainty, km/s
 rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
-dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
-                               peculiar=True,
-                            #    use_kriging=True
-                               )
+num_samples = 10000  # number of re-samples
+peculiar=True
+use_kriging=True
+dist = pdf_kd.pdf_kd(
+    glong, glat, velo, velo_err=velo_err, rotcurve=rotcurve, num_samples=num_samples,
+    peculiar=peculiar,
+    use_kriging=use_kriging
+)
 print(dist)
+
+# from kd import rotcurve_kd
+
+# glong = 30.0  # Galactic longitude, degrees
+# glat = 1.0  # Galactic latitude, degrees
+# velo = 20.0  # measured LSR velocity, km/s
+# velo_tol = 0.1  # tolerance to determine a "match" between rotation curve and measured LSR velocity (km/s)
+# rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
+# dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
+#                                peculiar=True,
+#                                use_kriging=True
+#                                )
+# print(dist)
 
 
 # * STATS WHERE KRIGING IS FALSE AND num_samples=10000, use_peculiar=True
