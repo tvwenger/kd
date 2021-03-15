@@ -247,7 +247,8 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
             rot_kd = rotcurve_kd(
                 glong[i], glat[i], velo[i], rotcurve=rotcurve,
                 dist_res=rotcurve_dist_res,
-                dist_max=rotcurve_dist_max)
+                dist_max=rotcurve_dist_max,
+                peculiar=peculiar, use_kriging=use_kriging)
             kdtypes = ["Rgal", "Rtan", "near", "far", "distance", "tangent"]
             labels = [r"$R$ (kpc)", r"$R_{\rm tan}$ (kpc)",
                       r"$d_{\rm near}$ (kpc)", r"$d_{\rm far}$ (kpc)",
