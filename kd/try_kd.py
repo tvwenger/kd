@@ -7,7 +7,7 @@ glat = 1.0  # Galactic latitude, degrees
 velo = 20.0  # measured LSR velocity, km/s
 velo_err = 5.0  # measured LSR velocity uncertainty, km/s
 rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
-num_samples = 10000  # number of re-samples
+num_samples = 1000  # number of re-samples
 peculiar=True
 use_kriging=True
 dist = pdf_kd.pdf_kd(
@@ -25,62 +25,44 @@ print(dist)
 # velo_tol = 0.1  # tolerance to determine a "match" between rotation curve and measured LSR velocity (km/s)
 # rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
 # dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
-#                                peculiar=True,
-#                                use_kriging=True
+#                             #    peculiar=True,
+#                             #    use_kriging=True
 #                                )
 # print(dist)
 
+# * MC KD STATS WHERE use_kriging=True AND num_samples=1000, use_peculiar=True
+# {'Rgal': 6.5679196741081505, 'Rgal_kde': <pyqt_fit.kde.KDE1D object at 0x7fe8c61163a0>,
+# 'Rgal_err_neg': 0.3124659942142243, 'Rgal_err_pos': 0.5827738780979574, 'Rtan':
+# 4.102692166719391, 'Rtan_kde': <pyqt_fit.kde.KDE1D object at 0x7fe8c6116670>,
+# 'Rtan_err_neg': 0.03382081017153471, 'Rtan_err_pos': 0.049040174748724574, 'near':
+# 1.1203723723723713, 'near_kde': <pyqt_fit.kde.KDE1D object at 0x7fe8c61164c0>,
+# 'near_err_neg': 0.6311951951951946, 'near_err_pos': 0.6379459459459453, 'far':
+# 12.637492492492482, 'far_kde': <pyqt_fit.kde.KDE1D object at 0x7fe8c61165e0>,
+# 'far_err_neg': 0.7990070070070079, 'far_err_pos': 0.33395995995995875, 'distance':
+# 0.43798798798798766, 'distance_kde': <pyqt_fit.kde.KDE1D object at 0x7fe8c61109d0>,
+# 'distance_err_neg': 0.41798798798798764, 'distance_err_pos': 12.818298298298286,
+# 'tangent': 6.91812612612612, 'tangent_kde': <pyqt_fit.kde.KDE1D object at 0x7fe8c6116c10>,
+# 'tangent_err_neg': 0.6737237237237235, 'tangent_err_pos': 0.49278078078078025,
+# 'vlsr_tangent': 128.30197539818863, 'vlsr_tangent_kde': <scipy.stats.kde.gaussian_kde
+# object at 0x7fe8c6116940>, 'vlsr_tangent_err_neg': 6.115230929207428,
+# 'vlsr_tangent_err_pos': 7.632879480981558}
 
-# * STATS WHERE KRIGING IS FALSE AND num_samples=10000, use_peculiar=True
-# {'Rgal': 7.113165261276646, 'Rgal_kde': <pyqt_fit.kde.KDE1D object at 0x7f483d37e490>,
-#  'Rgal_err_neg': 0.3289311988094408, 'Rgal_err_pos': 0.34434984875363295,
-#  'Rtan': 4.0910762243850085, 'Rtan_kde': <pyqt_fit.kde.KDE1D object at 0x7f483d37e2b0>,
-#  'Rtan_err_neg': 0.016299715815669913, 'Rtan_err_pos': 0.012584339416509494,
-#  'near': 1.183099099099098, 'near_kde': <pyqt_fit.kde.KDE1D object at 0x7f483d37e5b0>,
-#  'near_err_neg': 0.3429129129129125, 'near_err_pos': 0.47225725725725676,
-#  'far': 12.902038038038027, 'far_kde': <pyqt_fit.kde.KDE1D object at 0x7f483d37e370>,
-#  'far_err_neg': 0.39409409409409335, 'far_err_pos': 0.4290540540540544,
-#  'distance': 1.182108108108107,
-#  'distance_kde': <pyqt_fit.kde.KDE1D object at 0x7f483d37e880>,
-#  'distance_err_neg': 0.703608608608608, 'distance_err_pos': 12.521361361361352,
-#  'tangent': 7.087108108108102,
-#  'tangent_kde': <pyqt_fit.kde.KDE1D object at 0x7f483d37e280>,
-#  'tangent_err_neg': 0.02838738738738744, 'tangent_err_pos': 0.0217567567567567,
-#  'vlsr_tangent': 108.45176268476177,
-#  'vlsr_tangent_kde': <scipy.stats.kde.gaussian_kde object at 0x7f483d37e1c0>,
-#  'vlsr_tangent_err_neg': 6.56097129007523, 'vlsr_tangent_err_pos': 5.890507070651481}
-
-# {'Rgal': 6.815887055972002, 'Rgal_kde': <pyqt_fit.kde.KDE1D object at 0x7fa9f32080d0>,
-# 'Rgal_err_neg': 0.2910560890635976, 'Rgal_err_pos': 0.2304194038420153, 'Rtan':
-# 4.091961598431878, 'Rtan_kde': <pyqt_fit.kde.KDE1D object at 0x7fa9f32081f0>,
-# 'Rtan_err_neg': 0.015260318414514806, 'Rtan_err_pos': 0.013893722735603298, 'near':
-# 1.2010330330330319, 'near_kde': <pyqt_fit.kde.KDE1D object at 0x7fa9f3208490>,
-# 'near_err_neg': 0.38156756756756716, 'near_err_pos': 0.2920640640640637, 'far':
-# 12.55309109109108, 'far_kde': <pyqt_fit.kde.KDE1D object at 0x7fa9f3208280>,
-# 'far_err_neg': 0.37684384384384195, 'far_err_pos': 0.2794284284284281, 'distance':
-# 1.0722952952952942, 'distance_kde': <pyqt_fit.kde.KDE1D object at 0x7fa9f3208430>,
-# 'distance_err_neg': 0.6501431431431425, 'distance_err_pos': 12.172892892892882, 'tangent':
-# 6.966801801801796, 'tangent_kde': <pyqt_fit.kde.KDE1D object at 0x7fa9f3208160>,
-# 'tangent_err_neg': 0.046270270270270863, 'tangent_err_pos': 0.040165165165165106,
-# 'vlsr_tangent': 103.41141726309323, 'vlsr_tangent_kde': <scipy.stats.kde.gaussian_kde
-# object at 0x7fa9f3208250>, 'vlsr_tangent_err_neg': 2.1486288506405486,
-# 'vlsr_tangent_err_pos': 2.3516488995199865}
-
-# {'Rgal': 6.771681817508346, 'Rgal_kde': <pyqt_fit.kde.KDE1D object at 0x7fb214157460>,
-# 'Rgal_err_neg': 0.2468161648518823, 'Rgal_err_pos': 0.277162414628755, 'Rtan':
-# 4.091106476662002, 'Rtan_kde': <pyqt_fit.kde.KDE1D object at 0x7fb2141573a0>,
-# 'Rtan_err_neg': 0.014488359509440052, 'Rtan_err_pos': 0.014992302448899153, 'near':
-# 1.1214514514514506, 'near_kde': <pyqt_fit.kde.KDE1D object at 0x7fb2141575e0>,
-# 'near_err_neg': 0.29487487487487474, 'near_err_pos': 0.3810690690690688, 'far':
-# 12.479005005004995, 'far_kde': <pyqt_fit.kde.KDE1D object at 0x7fb214157550>,
-# 'far_err_neg': 0.3045085085085084, 'far_err_pos': 0.353539539539538, 'distance':
-# 1.071869869869869, 'distance_kde': <pyqt_fit.kde.KDE1D object at 0x7fb2141577c0>,
-# 'distance_err_neg': 0.6566826826826822, 'distance_err_pos': 12.183559559559548, 'tangent':
-# 6.963224224224218, 'tangent_kde': <pyqt_fit.kde.KDE1D object at 0x7fb2141574c0>,
-# 'tangent_err_neg': 0.044064064064063935, 'tangent_err_pos': 0.04127127127127128,
-# 'vlsr_tangent': 103.42586257157042, 'vlsr_tangent_kde': <scipy.stats.kde.gaussian_kde
-# object at 0x7fb214157100>, 'vlsr_tangent_err_neg': 2.1228568357115307,
-# 'vlsr_tangent_err_pos': 2.321874664059493}
+# * MC KD STATS WHERE use_kriging=False AND num_samples=1000, use_peculiar=True
+# {'Rgal': 6.772585433766652, 'Rgal_kde': <pyqt_fit.kde.KDE1D object at 0x7f1d1daa9c70>,
+# 'Rgal_err_neg': 0.26098633556927275, 'Rgal_err_pos': 0.27950794648064026, 'Rtan':
+# 4.091192541639824, 'Rtan_kde': <pyqt_fit.kde.KDE1D object at 0x7f1d1daae400>,
+# 'Rtan_err_neg': 0.015789913024458535, 'Rtan_err_pos': 0.0135194680144064, 'near':
+# 1.1968098098098086, 'near_kde': <pyqt_fit.kde.KDE1D object at 0x7f1d1daa9d90>,
+# 'near_err_neg': 0.39248448448448414, 'near_err_pos': 0.3002742742742739, 'far':
+# 12.49089989989989, 'far_kde': <pyqt_fit.kde.KDE1D object at 0x7f1d1daa9e20>,
+# 'far_err_neg': 0.33584484484484634, 'far_err_pos': 0.3444014014014005, 'distance':
+# 0.7071731731731726, 'distance_kde': <pyqt_fit.kde.KDE1D object at 0x7f1d1c22e1c0>,
+# 'distance_err_neg': 0.6641731731731727, 'distance_err_pos': 12.551517517517507, 'tangent':
+# 6.967413413413407, 'tangent_kde': <pyqt_fit.kde.KDE1D object at 0x7f1d1daaee20>,
+# 'tangent_err_neg': 0.0475775775775773, 'tangent_err_pos': 0.0345795795795798,
+# 'vlsr_tangent': 103.71326370375851, 'vlsr_tangent_kde': <scipy.stats.kde.gaussian_kde
+# object at 0x7f1d1daaed90>, 'vlsr_tangent_err_neg': 2.5667565844932767,
+# 'vlsr_tangent_err_pos': 2.0618208629536383}
 
 # * MC KD STATS WHERE use_kriging=False AND num_samples=10000, use_peculiar=True
 
