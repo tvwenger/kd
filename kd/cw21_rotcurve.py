@@ -115,7 +115,7 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
 
 
 def krige_UpecVpec(
-    x, y,
+    x, y, krige, Upec_var_threshold, Vpec_var_threshold,
     Upec_avg=__Upec, Vpec_avg=__Vpec,
     var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var):
     """
@@ -125,8 +125,17 @@ def krige_UpecVpec(
     Requires tvw's kriging program https://github.com/tvwenger/kriging
 
     Parameters:
-      x, y :: scalars or numpy array of scalars
+      x, y :: scalars or array of scalars
         Galactocentric Cartesian positions (kpc)
+
+      krige :: function
+        Kriging function that takes in parameters (x, y) to evaluate peculiar
+        motions at the given coordinate(s) (i.e. tvw's kriging program)
+
+      Upec_var_threshold, Vpec_var_threshold :: scalars
+        Maximum variance of Upec and Vpec allowed by kriging.
+        If the Upec and Vpec from kriging have variances larger than this,
+        this function will use the average Upec and Vpec instead
 
       Upec_avg :: scalar (optional)
         Average peculiar motion of HMSFRs toward galactic center (km/s)
@@ -139,28 +148,29 @@ def krige_UpecVpec(
         Variance of Upec_avg and Vpec_avg (km^2/s^2)
 
     Returns: Upec, Upec_var, Vpec, Vpec_var
-      Upec :: scalar or numpy array of scalars
+      Upec :: scalar or array of scalars
         Peculiar radial velocity of source toward galactic center (km/s)
 
-      Upec_var :: scalar or numpy array of scalars
+      Upec_var :: scalar or array of scalars
         Variance of Upec (km^2/s^2)
 
-      Vpec :: scalar or numpy array of scalars
+      Vpec :: scalar or array of scalars
         Peculiar tangential velocity of source in
         direction of galactic rotation (km/s)
 
-      Vpec_var :: scalar or numpy array of scalars
+      Vpec_var :: scalar or array of scalars
         Variance of Vpec (km^2/s^2)
     """
-    # krigefile contains: full KDE + KDEs of each component (e.g. "R0", "Zsun", etc.)
-    #                     + kriging function + kriging thresholds
-    krigefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
-    with open(krigefile, "rb") as f:
-        file = dill.load(f)
-        krige = file["krige"]
-        Upec_var_threshold = file["Upec_var_threshold"]
-        Vpec_var_threshold = file["Vpec_var_threshold"]
-        file = None  # free up resources
+    # # * NOW LOADING KRIGING FUNCTION + VARIABLES IN rotcurve_kd.py FOR OPTIMIZATION
+    # # krigefile contains: full KDE + KDEs of each component (e.g. "R0", "Zsun", etc.)
+    # #                     + kriging function + kriging thresholds
+    # krigefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
+    # with open(krigefile, "rb") as f:
+    #     file = dill.load(f)
+    #     krige = file["krige"]
+    #     Upec_var_threshold = file["Upec_var_threshold"]
+    #     Vpec_var_threshold = file["Vpec_var_threshold"]
+    #     file = None  # free up resources
 
     # Switch to convention used in kriging map
     # (Rotate 90 deg CW, Sun is on +y-axis)
@@ -193,17 +203,29 @@ def krige_UpecVpec(
     return Upec, Upec_var, Vpec, Vpec_var
 
 
-def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
+def nominal_params(glong=None, glat=None, dist=None,
+                   krige=None, Upec_var_threshold=None, Vpec_var_threshold=None,
+                   use_kriging=False):
     """
     Return a dictionary containing the nominal rotation curve
     parameters.
 
     Parameters:
-      glong, glat :: scalars or arrays of scalars
+      glong, glat :: scalars or arrays of scalars (optional, required for kriging)
         Galactic longitude and latitude (deg)
 
-      dist :: scalar or array of scalars
+      dist :: scalar or array of scalars (optional, required for kriging)
         Line-of-sight distance (kpc)
+
+      krige :: function (optional, required for kriging)
+        Kriging function that takes in parameters (x, y) to evaluate peculiar
+        motions at the given coordinate(s) (i.e. tvw's kriging program)
+
+      Upec_var_threshold, Vpec_var_threshold :: scalars (optional,
+                                                         required for kriging)
+        Maximum variance of Upec and Vpec allowed by kriging.
+        If the Upec and Vpec from kriging have variances larger than this,
+        the program will use the average Upec and Vpec instead
 
       use_kriging :: boolean (optional)
         If True, estimate individual Upec & Vpec from kriging program
@@ -222,11 +244,14 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
     """
     # print("In nominal params:", np.shape(glong), np.shape(glat), np.shape(dist))
     if use_kriging and glong is not None and glat is not None and dist is not None:
+        # if glong is None or glat is None or dist is None:
+        #     raise ValueError("Please supply all kriging coordinates (glong, glat, dist)")
         # Calculate galactocentric positions
         x, y, Rgal, cos_az, sin_az = calc_gcen_coords(glong, glat, dist, R0=__R0)
         # Calculate individual Upec and Vpec at source location(s)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
-            x, y, Upec_avg=__Upec, Vpec_avg=__Vpec,
+            x, y, krige, Upec_var_threshold, Vpec_var_threshold,
+            Upec_avg=__Upec, Vpec_avg=__Vpec,
             var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var)
     else:
         # Use average Upec and Vpec
@@ -257,22 +282,37 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
 #     for arg in args:
 #         print(arg, dict[arg])
 
-def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=False):
+def resample_params(kde, size=None, glong=None, glat=None, dist=None,
+                    krige=None, Upec_var_threshold=None, Vpec_var_threshold=None,
+                    use_kriging=False):
     """
     Resample the rotation curve parameters within their
     uncertainties using the CW21 kernel density estimator
     to include parameter covariances.
 
     Parameters:
+      kde :: kernel density estimator class (e.g. scipy.stats.gaussian_kde)
+        Kernel density estimator containing all the rotation model parameters
+
       size :: integer
         The number of random samples to generate (per source, if use_kriging).
         If None, generate only one sample and return a scalar
 
-      glong, glat :: scalars or arrays of scalars
+      glong, glat :: scalars or arrays of scalars (optional, required for kriging)
         Galactic longitude and latitude (deg)
 
-      dist :: scalar or array of scalars
+      dist :: scalar or array of scalars (optional, required for kriging)
         Line-of-sight distance (kpc)
+
+      krige :: function (optional, required for kriging)
+        Kriging function that takes in parameters (x, y) to evaluate peculiar
+        motions at the given coordinate(s) (i.e. tvw's kriging program)
+
+      Upec_var_threshold, Vpec_var_threshold :: scalars (optional,
+                                                         required for kriging)
+        Maximum variance of Upec and Vpec allowed by kriging.
+        If the Upec and Vpec from kriging have variances larger than this,
+        the program will use the average Upec and Vpec instead
 
       use_kriging :: boolean (optional)
         If True, estimate individual Upec & Vpec from kriging program
@@ -296,11 +336,12 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
         Cosine and sine of Galactocentric azimuth (rad)
     """
     # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
-    # kdefile contains: full KDE + KDEs of each component (e.g. "R0")
-    #                   + kriging function + kriging thresholds
-    kdefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
-    with open(kdefile, "rb") as f:
-        kde = dill.load(f)["full"]
+    # # * NOW LOADING KDE IN rotcurve_kd.py FOR OPTIMIZATION
+    # # kdefile contains: full KDE + KDEs of each component (e.g. "R0")
+    # #                   + kriging function + kriging thresholds
+    # kdefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
+    # with open(kdefile, "rb") as f:
+    #     kde = dill.load(f)["full"]
     if size is None:
         samples = kde.resample(1)
         params = {
@@ -343,7 +384,8 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
             glong, glat, dist, R0=params["R0"])
         # Calculate individual Upec and Vpec at source location(s)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
-            x, y, Upec_avg=Upec_avg, Vpec_avg=Vpec_avg,
+            x, y, krige, Upec_var_threshold, Vpec_var_threshold,
+            Upec_avg=Upec_avg, Vpec_avg=Vpec_avg,
             var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var)
         # Sample Upec and Vpec
         Upec = np.random.normal(loc=Upec, scale=np.sqrt(Upec_var))

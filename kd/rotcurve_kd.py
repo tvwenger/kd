@@ -27,9 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 2020-02-20 Trey V. Wenger updates for v2.0
 """
 
+import os
 import importlib
 import numpy as np
 import pathos.multiprocessing as mp
+import dill
 
 from kd import kd_utils
 
@@ -61,9 +63,23 @@ class Worker:
         # Get nominal rotation curve parameters
         #
         if rotcurve == "cw21_rotcurve":
+            # Load pickle file
+            infile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
+            # infile contains: full KDE + KDEs of each component (e.g. "R0")
+            #                  + kriging function + kriging thresholds
+            with open(infile, "rb") as f:
+                file = dill.load(f)
+                self.kde = file["full"]
+                self.krige = file["krige"]
+                self.Upec_var_threshold = file["Upec_var_threshold"]
+                self.Vpec_var_threshold = file["Vpec_var_threshold"]
+                file = None  # free up resources
             (self.nominal_params, self.Rgal,
              self.cos_az, self.sin_az) = self.rotcurve_module.nominal_params(
-                glong=glong, glat=glat, dist=dist_grid, use_kriging=use_kriging)
+                glong=glong, glat=glat, dist=dist_grid, krige=self.krige,
+                Upec_var_threshold=self.Upec_var_threshold,
+                Vpec_var_threshold=self.Vpec_var_threshold,
+                use_kriging=use_kriging)
         elif not use_kriging:
             self.nominal_params = self.rotcurve_module.nominal_params()
             self.Rgal = self.cos_az = self.sin_az = None
@@ -81,8 +97,15 @@ class Worker:
         if self.resample:
             if self.rotcurve == "cw21_rotcurve":
                 params, Rgal, cos_az, sin_az = self.rotcurve_module.resample_params(
+                    self.kde,
                     size=len(self.glong), glong=self.glong, glat=self.glat,
-                    dist=self.dist_grid, use_kriging=self.use_kriging)
+                    dist=self.dist_grid, krige=self.krige,
+                    Upec_var_threshold=self.Upec_var_threshold,
+                    Vpec_var_threshold=self.Vpec_var_threshold,
+                    use_kriging=self.use_kriging)
+                # Free up resources
+                # self.kde = self.krige = None
+                # self.Upec_var_threshold = self.Vpec_var_threshold = None
             else:
                 params = self.rotcurve_module.resample_params(
                     size=len(self.glong))
