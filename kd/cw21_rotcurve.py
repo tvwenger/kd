@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
-cw21_rotcurve.py
+cw21_rotcurve_old.py
+
+OLD FILE THAT HAS MEMORY LEAK ISSUE.
 
 Utilities involving the Universal Rotation Curve (Persic 1996) from
 Cheng & Wenger (2021), henceforth CW21, with re-done analysis by CW21.
@@ -33,13 +35,13 @@ import numpy as np
 from kriging import kriging  # Requires https://github.com/tvwenger/kriging
 from kd import kd_utils
 
-# Need the following lines because VScode...
-import sys
-from pathlib import Path
+# # Need the following lines because VScode...
+# import sys
+# from pathlib import Path
 
-_SCRIPT_DIR = str(Path.cwd() / Path(__file__).parent.parent)
-# Add to $PATH
-sys.path.append(_SCRIPT_DIR)
+# _SCRIPT_DIR = str(Path.cwd() / Path(__file__).parent.parent)
+# # Add to $PATH
+# sys.path.append(_SCRIPT_DIR)
 
 #
 # CW21 A6 rotation model parameters
@@ -95,12 +97,12 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
         x, y :: scalar or array of scalars
           Galactocentric Cartesian x- and y-coordinates
     """
-    # glong, glat, dist = np.copy(glong), np.copy(glat), np.copy(dist)
-    # print("glong1:", np.shape(glong), np.shape(glat), np.shape(dist), np.shape(R0))
+    # print("glong before:", np.shape(glong), np.shape(glat), np.shape(dist), np.shape(R0))
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
-    # print("glong2:", np.shape(glong), np.shape(glat), np.shape(dist), np.shape(R0))
+    if np.shape(glong) != np.shape(dist):
+        glong = np.array([glong, ] * len(dist))
+    # print("glong after:", np.shape(glong), np.shape(glat), np.shape(dist), np.shape(R0))
     Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
-    # print("Rgal:", np.shape(Rgal))
     Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
     az = kd_utils.calc_az(glong, glat, dist, R0=R0)
     cos_az = np.cos(np.deg2rad(az))
@@ -158,7 +160,7 @@ def krige_UpecVpec(
         krige = file["krige"]
         Upec_var_threshold = file["Upec_var_threshold"]
         Vpec_var_threshold = file["Vpec_var_threshold"]
-        file = None
+        file = None  # free up resources
 
     # Switch to convention used in kriging map
     # (Rotate 90 deg CW, Sun is on +y-axis)
@@ -166,19 +168,10 @@ def krige_UpecVpec(
 
     # Calculate expected Upec and Vpec at source location(s)
     Upec, Upec_var, Vpec, Vpec_var = krige(x, y)
-    # print("kriging results:", Upec, Upec_var, Vpec, Vpec_var)
-    # print("krige_UpecVpec, Upec before reshape:", np.shape(Upec))
     Upec = Upec.reshape(np.shape(x))
     Upec_var = Upec_var.reshape(np.shape(x))
     Vpec = Vpec.reshape(np.shape(x))
     Vpec_var = Vpec_var.reshape(np.shape(x))
-    # print("x, y", np.shape(x), np.shape(y))
-    # print("Upec_var", np.shape(Upec_var))
-    # print("Upec_avg", np.shape(Upec_avg))
-    # print("Upec", np.shape(Upec), type(Upec), Upec)
-    # print("var_Upec_avg", np.shape(var_Upec_avg))
-    # print("Upec_var_threshold:", type(Upec_var_threshold), Upec_var_threshold)
-    # print(Upec[Upec_var > 121])
 
     # Use average value if component is outside well-constrained area
     if np.isscalar(Upec):
@@ -187,30 +180,14 @@ def krige_UpecVpec(
         Upec_var = var_Upec_avg if Upec_var > Upec_var_threshold else Upec_var
         Vpec_var = var_Vpec_avg if Vpec_var > Vpec_var_threshold else Vpec_var
     else:
-        # print("Upec_avg shape:", np.shape(Upec_avg), np.shape(var_Upec_avg))
-        # if np.shape(Upec_avg) != np.shape(Upec):
-        #     # print("full_like Upec_avg and Vpec_avg")
-        #     Upec_avg = np.full_like(Upec, Upec_avg, float)
-        #     Vpec_avg = np.full_like(Vpec, Vpec_avg, float)
-        # if np.shape(var_Upec_avg) != np.shape(Upec):
-        #     # print("full_like var_Upec_avg and var_Vpec_avg")
-        #     var_Upec_avg = np.full_like(Upec, var_Upec_avg, float)
-        #     var_Vpec_avg = np.full_like(Vpec, var_Vpec_avg, float)
-        # print(Upec[:, 0:10])
-        # print(Upec_avg[:, 0:10])
-        # print("krige_UpecVpec, Upec, Upec_avg after reshape", np.shape(Upec), np.shape(Upec_avg))
         Upec_mask = Upec_var > Upec_var_threshold
         Vpec_mask = Vpec_var > Vpec_var_threshold
-        # Upec[Upec_mask] = Upec_avg[Upec_mask]
-        # Vpec[Vpec_mask] = Vpec_avg[Vpec_mask]
-        # Upec_var[Upec_mask] = var_Upec_avg[Upec_mask]
-        # Vpec_var[Vpec_mask] = var_Vpec_avg[Vpec_mask]
         Upec[Upec_mask] = Upec_avg
         Vpec[Vpec_mask] = Vpec_avg
         Upec_var[Upec_mask] = var_Upec_avg
         Vpec_var[Vpec_mask] = var_Vpec_avg
 
-    # print("Final kriging results:", Upec, Upec_var, Vpec, Vpec_var)
+    # Free up resources
     krige = Upec_var_threshold = Vpec_var_threshold = None
 
     return Upec, Upec_var, Vpec, Vpec_var
@@ -243,9 +220,8 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
       cos_az, sin_az :: scalar or array of scalars
         Cosine and sine of Galactocentric azimuth (rad)
     """
-    print("In nominal params:", np.shape(glong), np.shape(glat), np.shape(dist))
+    # print("In nominal params:", np.shape(glong), np.shape(glat), np.shape(dist))
     if use_kriging and glong is not None and glat is not None and dist is not None:
-        print("Using kriging in nominal params")
         # Calculate galactocentric positions
         x, y, Rgal, cos_az, sin_az = calc_gcen_coords(glong, glat, dist, R0=__R0)
         # Calculate individual Upec and Vpec at source location(s)
@@ -259,7 +235,6 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
         # Upec_var = __Upec_var
         # Vpec_var = __Vpec_var
         Rgal = cos_az = sin_az = None
-    print("Exiting nominal params")
 
     params = {
         "R0": __R0,
@@ -275,7 +250,6 @@ def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
         "a2": __a2,
         "a3": __a3,
     }
-    # print(np.shape(params["Upec"]))
     return params, Rgal, cos_az, sin_az
 
 
@@ -321,6 +295,7 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
       cos_az, sin_az :: scalar or array of scalars
         Cosine and sine of Galactocentric azimuth (rad)
     """
+    # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
     # kdefile contains: full KDE + KDEs of each component (e.g. "R0")
     #                   + kriging function + kriging thresholds
     kdefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
@@ -358,47 +333,15 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
             "a2": samples[8],
             "a3": samples[9],
         }
-    kde = None
+    kde = None  # free up resources
 
     if use_kriging and glong is not None and glat is not None and dist is not None:
-        # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
-        # print(np.shape(params["Upec"]))
-
-        # if np.size(glong) == 1 and np.size(glat) == 1 and np.size(dist) == 1:
-        # if np.size(glong) == 1 and np.size(glat) == 1:
-        #     Upec_avg = params["Upec"]
-        #     Vpec_avg = params["Vpec"]
-        #     var_Upec_avg = params["Upec_var"]
-        #     var_Vpec_avg = params["Vpec_var"]
-        # else:
-        #     Upec_avg = np.array([params["Upec"],] * len(glong))
-        #     Vpec_avg = np.array([params["Vpec"],] * len(glong))
-        #     var_Upec_avg = np.array([params["Upec_var"],] * len(glong))
-        #     var_Vpec_avg = np.array([params["Vpec_var"],] * len(glong))
-
         Upec_avg = params["Upec"]
         Vpec_avg = params["Vpec"]
-        # var_Upec_avg = params["Upec_var"]
-        # var_Vpec_avg = params["Vpec_var"]
-        # if size is not None:
-        #     # Shape = (# sources, size) if # sources > 1; else: shape = (size)
-        #     # i.e., columns are the same source, rows are all the samples of one source
-        #     glong = np.array([glong,] * size).T
-        #     glat = np.array([glat,] * size).T
-        #     # dist = np.array([dist,] * size).T
-
-        # if np.shape(glong) != np.shape(Upec_avg):
-        #     raise ValueError("Please ensure glong, glat, and dist are 1D arrays" + \
-        #                      f"\nglong shape: {np.shape(glong)} " + \
-        #                      f"vs. Upec_avg shape: {np.shape(Upec_avg)}")
-
         # Calculate galactocentric positions
         x, y, Rgal, cos_az, sin_az = calc_gcen_coords(
             glong, glat, dist, R0=params["R0"])
         # Calculate individual Upec and Vpec at source location(s)
-        # Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
-        #     x, y, Upec_avg=Upec_avg, Vpec_avg=Vpec_avg,
-        #     var_Upec_avg=var_Upec_avg, var_Vpec_avg=var_Vpec_avg)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
             x, y, Upec_avg=Upec_avg, Vpec_avg=Vpec_avg,
             var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var)
@@ -421,75 +364,9 @@ def resample_params(size=None, glong=None, glat=None, dist=None, use_kriging=Fal
             "a2": params_orig["a2"],
             "a3": params_orig["a3"],
         }
-        # print("Upec_avg", Upec_avg)
-        # print("Upec", params["Upec"])
-        # print(params["a3"])
-        # print(params["Vpec"])
-        # print(np.sqrt(params["Vpec_var"]))
-        # printit(params, **params)
     else:
         Rgal = cos_az = sin_az = None
-
-    # print("Resample_params final Upec shape:", np.shape(params["Upec"]))
     return params, Rgal, cos_az, sin_az
-
-
-# * --- TEST STUFF ---
-# resample_params(size=None, glong=np.array([19.36]), glat=np.array([-0.03]),
-#                 dist=np.array([2.84]), use_kriging=True)
-# resample_params(size=4, glong=19.36, glat=-0.03, dist=2.84, use_kriging=True)
-# resample_params(
-#     size=None,
-#     glong=np.array([19.36, 36.12]),
-#     glat=np.array([-0.03, 0.55]),
-#     dist=np.array([2.84, 4.07]),
-#     use_kriging=True,
-# )
-# resample_params(
-#     size=4,
-#     glong=np.array([19.36, 12.12]),
-#     glat=np.array([-0.03, 111.55]),
-#     dist=np.array([2.84, 4.07]),
-#     use_kriging=True,
-# )
-# # The following should fail... (?)
-# resample_params(
-#     size=None,
-#     glong=np.array([[19.36, 36.12],[19.36, 36.12]]),
-#     glat=np.array([[-0.03, 0.55], [-0.03, 0.55]]),
-#     dist=np.array([[2.84, 4.07], [2.84, 4.07]]),
-#     use_kriging=True,
-# )
-# TODO: check each of the above cases. YES!
-# TODO: fix all calls in rotcurve_kd.py. I think it is done...
-# * --- TEST STUFF ---
-# def nominal_params():
-#     """
-#     Return a dictionary containing the nominal rotation curve
-#     parameters.
-
-#     Parameters: Nothing
-
-#     Returns: params
-#       params :: dictionary
-#         params['a1'], etc. : scalar
-#           The nominal rotation curve parameter
-#     """
-#     params = {
-#         "R0": __R0,
-#         "Zsun": __Zsun,
-#         "Usun": __Usun,
-#         "Vsun": __Vsun,
-#         "Wsun": __Wsun,
-#         "Upec": __Upec,
-#         "Upec_var": __Upec_var,
-#         "Vpec": __Vpec,
-#         "Vpec_var": __Vpec_var,
-#         "roll": __roll,
-#         "a2": __a2,
-#         "a3": __a3,
-#     }
-#     return params
 
 
 def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
@@ -579,6 +456,7 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
       vlsr :: scalar or array of scalars
         LSR velocity (km/s).
     """
+    # print("glong, glat, dist in calc_vlsr", np.shape(glong), np.shape(glat), np.shape(dist))
     input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     cos_glong = np.cos(np.deg2rad(glong))
@@ -598,11 +476,14 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
         # print("az shape", np.shape(az))
         cos_az = np.cos(np.deg2rad(az))
         sin_az = np.sin(np.deg2rad(az))
+    # print("Rgal, cos_az, sin_az in calc_vlsr", np.shape(Rgal), np.shape(cos_az), np.shape(sin_az))
     #
     # Rotation curve circular velocity
     #
     theta = calc_theta(Rgal, a2=a2, a3=a3, R0=R0)
     theta0 = calc_theta(R0, a2=a2, a3=a3, R0=R0)
+    # print("Theta, theta0 in calc_vlsr", np.shape(theta), np.shape(theta0))
+    # print("Upec, Vpec in calc_vlsr", np.shape(Upec), np.shape(Vpec))
     #
     # Add HMSFR peculiar motion
     #
@@ -617,12 +498,14 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vXg = -vR * cos_az + vAz * sin_az
     vYg = vR * sin_az + vAz * cos_az
     vZg = vZ
+    # print("1st vXg, vYg, vZg in calc_vlsr", np.shape(vXg), np.shape(vYg), np.shape(vZg))
     #
     # Convert to barycentric
     #
     X = dist * cos_glat * cos_glong
     Y = dist * cos_glat * sin_glong
     Z = dist * sin_glat
+    # print("X, Y, Z in calc_vlsr", np.shape(X), np.shape(Y), np.shape(Z))
     # useful constants
     sin_tilt = Zsun / 1000.0 / R0
     cos_tilt = np.cos(np.arcsin(sin_tilt))
@@ -632,6 +515,7 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vXg = vXg - Usun
     vYg = vYg - theta0 - Vsun
     vZg = vZg - Wsun
+    # print("2nd vXg, vYg, vZg in calc_vlsr", np.shape(vXg), np.shape(vYg), np.shape(vZg))
     # correct tilt and roll of Galactic midplane
     vXg1 = vXg * cos_tilt - vZg * sin_tilt
     vYg1 = vYg
@@ -640,21 +524,24 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vYh = vYg1 * cos_roll + vZg1 * sin_roll
     vZh = -vYg1 * sin_roll + vZg1 * cos_roll
     vbary = (X * vXh + Y * vYh + Z * vZh) / dist
+    # print("vbary in calc_vlsr", np.shape(vbary))
     #
     # Convert to IAU-LSR
     #
     vlsr = (
         vbary + (__Ustd * cos_glong + __Vstd * sin_glong) * cos_glat + __Wsun * sin_glat
     )
-    if use_kriging and np.shape(vlsr)[1] > 1:
-        # vlsr = np.median(vlsr, axis=1)[:, np.newaxis]
-        # print("vlsr", np.shape(vlsr))
-        # print(vlsr[0:10, 0:10])
-        vlsr = vlsr[0]
-        vlsr = vlsr[:, np.newaxis]
-    # print("vlsr", np.shape(vlsr))
-    # print("vlsr[0]", vlsr[0])
-    # print("vlsr[1:10]", vlsr[1:10])
+    # if use_kriging and np.shape(vlsr)[1] > 1:
+    #     # vlsr = np.median(vlsr, axis=1)[:, np.newaxis]
+    #     # print("vlsr", np.shape(vlsr))
+    #     # print(vlsr[0:10, 0:10])
+    #     vlsr = vlsr[0]
+    #     vlsr = vlsr[:, np.newaxis]
+    # # print("vlsr", np.shape(vlsr))
+    # # print("vlsr[0]", vlsr[0])
+    # # print("vlsr[1:10]", vlsr[1:10])
     if input_scalar:
         return vlsr[0]
+
+    # print("final vlsr shape", np.shape(vlsr))
     return vlsr

@@ -220,6 +220,9 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
     nresult = 0
     with mp.Pool() as pool:
         kde_results = pool.map(calc_hpd_wrapper, args)
+    print("Closing pool in pdf_kd")
+    pool.close()
+    pool.join()
     for kdtype, kdetype in zip(kdtypes, kdetypes):
         for i in np.ndindex(glong.shape):
             kde, mode, lower, upper = kde_results[nresult]

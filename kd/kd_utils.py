@@ -280,7 +280,7 @@ def calc_anderson2012_uncertainty(glong, vlsr):
 
     Raises:
       ValueError : if glong and vlsr are not 1-D; or
-                   if glong and vlsr are arrays and 
+                   if glong and vlsr are arrays and
                    not the same size
     """
     input_scalar = np.isscalar(glong)

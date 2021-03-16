@@ -24,7 +24,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 2017-04-12 Trey V. Wenger
-2020-02-20 Trey V. Wener updates for v2.0
+2020-02-20 Trey V. Wenger updates for v2.0
 """
 
 import importlib
@@ -63,7 +63,7 @@ class Worker:
         if rotcurve == "cw21_rotcurve":
             (self.nominal_params, self.Rgal,
              self.cos_az, self.sin_az) = self.rotcurve_module.nominal_params(
-                glong=glong, glat=glat, dist=dist_grid.T, use_kriging=use_kriging)
+                glong=glong, glat=glat, dist=dist_grid, use_kriging=use_kriging)
         elif not use_kriging:
             self.nominal_params = self.rotcurve_module.nominal_params()
             self.Rgal = self.cos_az = self.sin_az = None
@@ -82,10 +82,7 @@ class Worker:
             if self.rotcurve == "cw21_rotcurve":
                 params, Rgal, cos_az, sin_az = self.rotcurve_module.resample_params(
                     size=len(self.glong), glong=self.glong, glat=self.glat,
-                    dist=self.dist_grid.T, use_kriging=self.use_kriging)
-                # params, Rgal, cos_az, sin_az = self.rotcurve_module.resample_params(
-                #     size=self.size, glong=self.glong, glat=self.glat,
-                #     dist=self.dist_grid.T, use_kriging=self.use_kriging)
+                    dist=self.dist_grid, use_kriging=self.use_kriging)
             else:
                 params = self.rotcurve_module.resample_params(
                     size=len(self.glong))
@@ -100,13 +97,9 @@ class Worker:
         #
         # Calculate LSR velocity at each (glong, distance) point
         #
-        # ? Check following code works with kriging.
-        # ? Might need to transpose Upec, etc. Should be okay?
         if self.rotcurve == "cw21_rotcurve":
             grid_vlsrs = self.rotcurve_module.calc_vlsr(
                 self.glong_grid, self.glat, self.dist_grid,
-                # ? TAKES UP TOO MUCH MEMORY!?!?!
-                # ? MAYBE KRIGING ITSELF?
                 Rgal=Rgal, cos_az=cos_az, sin_az=sin_az,
                 peculiar=self.peculiar, use_kriging=self.use_kriging, **params)
         elif self.rotcurve == "reid19_rotcurve":
@@ -284,8 +277,7 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))
     # Free memory even though pool should be closed already
-    # ! Does not help whether it is inside or outside context manager
-    print("Closing pool")
+    print("Closing pool in rotcurve_kd_old")
     pool.close()
     pool.join()
     #
