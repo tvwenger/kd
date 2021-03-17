@@ -29,19 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 2021-03-03 Trey V. Wenger new in V2.0
 """
 
-import os
-import dill
 import numpy as np
-from kriging import kriging  # Requires https://github.com/tvwenger/kriging
 from kd import kd_utils
-
-# # Need the following lines because VScode...
-# import sys
-# from pathlib import Path
-
-# _SCRIPT_DIR = str(Path.cwd() / Path(__file__).parent.parent)
-# # Add to $PATH
-# sys.path.append(_SCRIPT_DIR)
 
 #
 # CW21 A6 rotation model parameters
@@ -90,18 +79,16 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
       dist :: scalar or array of scalars
         line-of-sight distance (kpc)
 
-      R0 :: scalar or array of scalars
+      R0 :: scalar or array of scalars (optional)
         Galactocentric radius of the Sun
 
       Returns: x, y
         x, y :: scalar or array of scalars
           Galactocentric Cartesian x- and y-coordinates
     """
-    # print("glong before:", np.shape(glong), np.shape(glat), np.shape(dist), np.shape(R0))
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     if np.shape(glong) != np.shape(dist):
         glong = np.array([glong, ] * len(dist))
-    # print("glong after:", np.shape(glong), np.shape(glat), np.shape(dist), np.shape(R0))
     Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
     Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
     az = kd_utils.calc_az(glong, glat, dist, R0=R0)
@@ -114,18 +101,17 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
     return x, y, Rgal, cos_az, sin_az
 
 
-def krige_UpecVpec(
-    x, y, krige, Upec_var_threshold, Vpec_var_threshold,
-    Upec_avg=__Upec, Vpec_avg=__Vpec,
-    var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var):
+def krige_UpecVpec(x, y, krige, Upec_var_threshold, Vpec_var_threshold,
+                   Upec_avg=__Upec, Vpec_avg=__Vpec,
+                   var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var):
     """
-    Estimates peculiar radial velocity (positive towarrd GC) and
-    tangential velocity at a position (positive in direction of
-    galactic rotation) using kriging function.
+    Estimates the peculiar radial velocity (positive toward GC) and
+    tangential velocity (positive in direction of galactic rotation)
+    at a given (x, y) position using kriging.
     Requires tvw's kriging program https://github.com/tvwenger/kriging
 
     Parameters:
-      x, y :: scalars or array of scalars
+      x, y :: scalars or arrays of scalars
         Galactocentric Cartesian positions (kpc)
 
       krige :: function
@@ -148,30 +134,19 @@ def krige_UpecVpec(
         Variance of Upec_avg and Vpec_avg (km^2/s^2)
 
     Returns: Upec, Upec_var, Vpec, Vpec_var
-      Upec :: scalar or array of scalars
+      Upec :: array of scalars
         Peculiar radial velocity of source toward galactic center (km/s)
 
-      Upec_var :: scalar or array of scalars
+      Upec_var :: array of scalars
         Variance of Upec (km^2/s^2)
 
-      Vpec :: scalar or array of scalars
+      Vpec :: array of scalars
         Peculiar tangential velocity of source in
         direction of galactic rotation (km/s)
 
-      Vpec_var :: scalar or array of scalars
+      Vpec_var :: array of scalars
         Variance of Vpec (km^2/s^2)
     """
-    # # * NOW LOADING KRIGING FUNCTION + VARIABLES IN rotcurve_kd.py FOR OPTIMIZATION
-    # # krigefile contains: full KDE + KDEs of each component (e.g. "R0", "Zsun", etc.)
-    # #                     + kriging function + kriging thresholds
-    # krigefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
-    # with open(krigefile, "rb") as f:
-    #     file = dill.load(f)
-    #     krige = file["krige"]
-    #     Upec_var_threshold = file["Upec_var_threshold"]
-    #     Vpec_var_threshold = file["Vpec_var_threshold"]
-    #     file = None  # free up resources
-
     # Switch to convention used in kriging map
     # (Rotate 90 deg CW, Sun is on +y-axis)
     x, y = y, -x
@@ -184,18 +159,12 @@ def krige_UpecVpec(
     Vpec_var = Vpec_var.reshape(np.shape(x))
 
     # Use average value if component is outside well-constrained area
-    if np.isscalar(Upec):
-        Upec = Upec_avg if Upec_var > Upec_var_threshold else Upec
-        Vpec = Vpec_avg if Vpec_var > Vpec_var_threshold else Vpec
-        Upec_var = var_Upec_avg if Upec_var > Upec_var_threshold else Upec_var
-        Vpec_var = var_Vpec_avg if Vpec_var > Vpec_var_threshold else Vpec_var
-    else:
-        Upec_mask = Upec_var > Upec_var_threshold
-        Vpec_mask = Vpec_var > Vpec_var_threshold
-        Upec[Upec_mask] = Upec_avg
-        Vpec[Vpec_mask] = Vpec_avg
-        Upec_var[Upec_mask] = var_Upec_avg
-        Vpec_var[Vpec_mask] = var_Vpec_avg
+    Upec_mask = Upec_var > Upec_var_threshold
+    Vpec_mask = Vpec_var > Vpec_var_threshold
+    Upec[Upec_mask] = Upec_avg
+    Vpec[Vpec_mask] = Vpec_avg
+    Upec_var[Upec_mask] = var_Upec_avg
+    Vpec_var[Vpec_mask] = var_Vpec_avg
 
     # Free up resources
     krige = Upec_var_threshold = Vpec_var_threshold = None
@@ -242,10 +211,7 @@ def nominal_params(glong=None, glat=None, dist=None,
       cos_az, sin_az :: scalar or array of scalars
         Cosine and sine of Galactocentric azimuth (rad)
     """
-    # print("In nominal params:", np.shape(glong), np.shape(glat), np.shape(dist))
     if use_kriging and glong is not None and glat is not None and dist is not None:
-        # if glong is None or glat is None or dist is None:
-        #     raise ValueError("Please supply all kriging coordinates (glong, glat, dist)")
         # Calculate galactocentric positions
         x, y, Rgal, cos_az, sin_az = calc_gcen_coords(glong, glat, dist, R0=__R0)
         # Calculate individual Upec and Vpec at source location(s)
@@ -257,8 +223,8 @@ def nominal_params(glong=None, glat=None, dist=None,
         # Use average Upec and Vpec
         Upec = __Upec
         Vpec = __Vpec
-        # Upec_var = __Upec_var
-        # Vpec_var = __Vpec_var
+        Upec_var = __Upec_var
+        Vpec_var = __Vpec_var
         Rgal = cos_az = sin_az = None
 
     params = {
@@ -268,9 +234,9 @@ def nominal_params(glong=None, glat=None, dist=None,
         "Vsun": __Vsun,
         "Wsun": __Wsun,
         "Upec": Upec,
-        # "Upec_var": Upec_var,
+        "Upec_var": Upec_var,
         "Vpec": Vpec,
-        # "Vpec_var": Vpec_var,
+        "Vpec_var": Vpec_var,
         "roll": __roll,
         "a2": __a2,
         "a3": __a3,
@@ -278,13 +244,7 @@ def nominal_params(glong=None, glat=None, dist=None,
     return params, Rgal, cos_az, sin_az
 
 
-# def printit(dict, **args):
-#     for arg in args:
-#         print(arg, dict[arg])
-
-def resample_params(kde, size=None, glong=None, glat=None, dist=None,
-                    krige=None, Upec_var_threshold=None, Vpec_var_threshold=None,
-                    use_kriging=False):
+def resample_params(kde, size=None, nom_params=None, use_kriging=False):
     """
     Resample the rotation curve parameters within their
     uncertainties using the CW21 kernel density estimator
@@ -298,50 +258,19 @@ def resample_params(kde, size=None, glong=None, glat=None, dist=None,
         The number of random samples to generate (per source, if use_kriging).
         If None, generate only one sample and return a scalar
 
-      glong, glat :: scalars or arrays of scalars (optional, required for kriging)
-        Galactic longitude and latitude (deg)
-
-      dist :: scalar or array of scalars (optional, required for kriging)
-        Line-of-sight distance (kpc)
-
-      krige :: function (optional, required for kriging)
-        Kriging function that takes in parameters (x, y) to evaluate peculiar
-        motions at the given coordinate(s) (i.e. tvw's kriging program)
-
-      Upec_var_threshold, Vpec_var_threshold :: scalars (optional,
-                                                         required for kriging)
-        Maximum variance of Upec and Vpec allowed by kriging.
-        If the Upec and Vpec from kriging have variances larger than this,
-        the program will use the average Upec and Vpec instead
+      nom_params :: dictionary (optional, required for kriging)
+        Dictionary containing the kriging values of Upec, Vpec,
+        and their associated variances (Upec_var, Vpec_var)
 
       use_kriging :: boolean (optional)
         If True, estimate individual Upec & Vpec from kriging program
         If False, use average Upec & Vpec
 
-    Returns: params, Rgal, cos_az, sin_az
+    Returns: params
       params :: dictionary
         params['R0'], etc. : scalar or array of scalars
                              The re-sampled parameters
-        If use_kriging :
-            Each shape of 'Upec', 'Vpec', 'Upec_var', and 'Vpec_var' is
-            = (# sources, size) if # sources > 1
-              i.e., columns are the same source,
-              rows are all n=size samples of one source
-            = (size) if # sources == 1
-
-      Rgal :: scalar or array of scalars
-        Galactocentric cylindrical radius (kpc)
-
-      cos_az, sin_az :: scalar or array of scalars
-        Cosine and sine of Galactocentric azimuth (rad)
     """
-    # print("In resample params:", np.shape(glong), np.shape(glat), np.shape(dist))
-    # # * NOW LOADING KDE IN rotcurve_kd.py FOR OPTIMIZATION
-    # # kdefile contains: full KDE + KDEs of each component (e.g. "R0")
-    # #                   + kriging function + kriging thresholds
-    # kdefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
-    # with open(kdefile, "rb") as f:
-    #     kde = dill.load(f)["full"]
     if size is None:
         samples = kde.resample(1)
         params = {
@@ -351,9 +280,9 @@ def resample_params(kde, size=None, glong=None, glat=None, dist=None,
             "Vsun": samples[3][0],
             "Wsun": samples[4][0],
             "Upec": samples[5][0],
-            # "Upec_var": __Upec_var,
+            "Upec_var": __Upec_var,
             "Vpec": samples[6][0],
-            # "Vpec_var": __Vpec_var,
+            "Vpec_var": __Vpec_var,
             "roll": samples[7][0],
             "a2": samples[8][0],
             "a3": samples[9][0],
@@ -367,26 +296,20 @@ def resample_params(kde, size=None, glong=None, glat=None, dist=None,
             "Vsun": samples[3],
             "Wsun": samples[4],
             "Upec": samples[5],
-            # "Upec_var": np.array([__Upec_var,] * size),
+            "Upec_var": __Upec_var,
             "Vpec": samples[6],
-            # "Vpec_var": np.array([__Vpec_var,] * size),
+            "Vpec_var": __Vpec_var,
             "roll": samples[7],
             "a2": samples[8],
             "a3": samples[9],
         }
     kde = None  # free up resources
 
-    if use_kriging and glong is not None and glat is not None and dist is not None:
-        Upec_avg = params["Upec"]
-        Vpec_avg = params["Vpec"]
-        # Calculate galactocentric positions
-        x, y, Rgal, cos_az, sin_az = calc_gcen_coords(
-            glong, glat, dist, R0=params["R0"])
-        # Calculate individual Upec and Vpec at source location(s)
-        Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
-            x, y, krige, Upec_var_threshold, Vpec_var_threshold,
-            Upec_avg=Upec_avg, Vpec_avg=Vpec_avg,
-            var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var)
+    if use_kriging and nom_params is not None:
+        Upec = nom_params["Upec"]
+        Vpec = nom_params["Vpec"]
+        Upec_var = nom_params["Upec_var"]
+        Vpec_var = nom_params["Vpec_var"]
         # Sample Upec and Vpec
         Upec = np.random.normal(loc=Upec, scale=np.sqrt(Upec_var))
         Vpec = np.random.normal(loc=Vpec, scale=np.sqrt(Vpec_var))
@@ -399,16 +322,14 @@ def resample_params(kde, size=None, glong=None, glat=None, dist=None,
             "Vsun": params_orig["Vsun"],
             "Wsun": params_orig["Wsun"],
             "Upec": Upec,
-            # "Upec_var": Upec_var,
+            "Upec_var": Upec_var,
             "Vpec": Vpec,
-            # "Vpec_var": Vpec_var,
+            "Vpec_var": Vpec_var,
             "roll": params_orig["roll"],
             "a2": params_orig["a2"],
             "a3": params_orig["a3"],
         }
-    else:
-        Rgal = cos_az = sin_az = None
-    return params, Rgal, cos_az, sin_az
+    return params
 
 
 def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
@@ -461,7 +382,7 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
               R0=__R0, Usun=__Usun, Vsun=__Vsun,
               Wsun=__Wsun, Upec=__Upec, Upec_var=__Upec_var,
               Vpec=__Vpec, Vpec_var=__Vpec_var, a2=__a2, a3=__a3,
-              Zsun=__Zsun, roll=__roll, peculiar=False, use_kriging=False):
+              Zsun=__Zsun, roll=__roll, peculiar=False):
     """
     Return the IAU-LSR velocity at a given Galactic longitude and
     line-of-sight distance.
@@ -484,6 +405,11 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
 
       Usun, Vsun, Wsun, Upec, Vpec, a2, a3 :: scalars (optional)
         CW21 rotation curve parameters
+
+      Upec_var, Vpec_var :: scalars (optional)
+        Variance in Upec/Vpec values
+        Not used but must be stored in the params dictionary,
+        hence they are parameters here
 
       Zsun :: scalar (optional)
         Height of sun above Galactic midplane (pc)
@@ -511,11 +437,8 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
         # print("Calculating Rgal in calc_vlsr")
         # Convert distance to Galactocentric, catch small Rgal
         Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
-        # print("Rgal shape", np.shape(Rgal))
-        # print("glong shape after Rgal:", np.shape(glong))
-        Rgal[Rgal < 1.0e-6] = 1.0e-6
+        Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
         az = kd_utils.calc_az(glong, glat, dist, R0=R0)
-        # print("az shape", np.shape(az))
         cos_az = np.cos(np.deg2rad(az))
         sin_az = np.sin(np.deg2rad(az))
     # print("Rgal, cos_az, sin_az in calc_vlsr", np.shape(Rgal), np.shape(cos_az), np.shape(sin_az))
@@ -573,17 +496,7 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vlsr = (
         vbary + (__Ustd * cos_glong + __Vstd * sin_glong) * cos_glat + __Wsun * sin_glat
     )
-    # if use_kriging and np.shape(vlsr)[1] > 1:
-    #     # vlsr = np.median(vlsr, axis=1)[:, np.newaxis]
-    #     # print("vlsr", np.shape(vlsr))
-    #     # print(vlsr[0:10, 0:10])
-    #     vlsr = vlsr[0]
-    #     vlsr = vlsr[:, np.newaxis]
-    # # print("vlsr", np.shape(vlsr))
-    # # print("vlsr[0]", vlsr[0])
-    # # print("vlsr[1:10]", vlsr[1:10])
     if input_scalar:
         return vlsr[0]
-
     # print("final vlsr shape", np.shape(vlsr))
     return vlsr

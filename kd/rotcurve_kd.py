@@ -70,9 +70,13 @@ class Worker:
             with open(infile, "rb") as f:
                 file = dill.load(f)
                 self.kde = file["full"]
-                self.krige = file["krige"]
-                self.Upec_var_threshold = file["Upec_var_threshold"]
-                self.Vpec_var_threshold = file["Vpec_var_threshold"]
+                if use_kriging:
+                    self.krige = file["krige"]
+                    self.Upec_var_threshold = file["Upec_var_threshold"]
+                    self.Vpec_var_threshold = file["Vpec_var_threshold"]
+                else:
+                    self.krige = None
+                    self.Upec_var_threshold = self.Vpec_var_threshold = None
                 file = None  # free up resources
             (self.nominal_params, self.Rgal,
              self.cos_az, self.sin_az) = self.rotcurve_module.nominal_params(
@@ -80,6 +84,9 @@ class Worker:
                 Upec_var_threshold=self.Upec_var_threshold,
                 Vpec_var_threshold=self.Vpec_var_threshold,
                 use_kriging=use_kriging)
+            # Free up resources
+            self.krige = None
+            self.Upec_var_threshold = self.Vpec_var_threshold = None
         elif not use_kriging:
             self.nominal_params = self.rotcurve_module.nominal_params()
             self.Rgal = self.cos_az = self.sin_az = None
@@ -96,16 +103,10 @@ class Worker:
         #
         if self.resample:
             if self.rotcurve == "cw21_rotcurve":
-                params, Rgal, cos_az, sin_az = self.rotcurve_module.resample_params(
-                    self.kde,
-                    size=len(self.glong), glong=self.glong, glat=self.glat,
-                    dist=self.dist_grid, krige=self.krige,
-                    Upec_var_threshold=self.Upec_var_threshold,
-                    Vpec_var_threshold=self.Vpec_var_threshold,
+                params = self.rotcurve_module.resample_params(
+                    self.kde, size=len(self.glong),
+                    nom_params=self.nominal_params,
                     use_kriging=self.use_kriging)
-                # Free up resources
-                # self.kde = self.krige = None
-                # self.Upec_var_threshold = self.Vpec_var_threshold = None
             else:
                 params = self.rotcurve_module.resample_params(
                     size=len(self.glong))
@@ -113,9 +114,6 @@ class Worker:
                 loc=self.velo, scale=self.velo_err)
         else:
             params = self.nominal_params
-            Rgal = self.Rgal
-            cos_az = self.cos_az
-            sin_az = self.sin_az
             velo_sample = self.velo
         #
         # Calculate LSR velocity at each (glong, distance) point
@@ -123,8 +121,8 @@ class Worker:
         if self.rotcurve == "cw21_rotcurve":
             grid_vlsrs = self.rotcurve_module.calc_vlsr(
                 self.glong_grid, self.glat, self.dist_grid,
-                Rgal=Rgal, cos_az=cos_az, sin_az=sin_az,
-                peculiar=self.peculiar, use_kriging=self.use_kriging, **params)
+                Rgal=self.Rgal, cos_az=self.cos_az, sin_az=self.sin_az,
+                peculiar=self.peculiar, **params)
         elif self.rotcurve == "reid19_rotcurve":
             grid_vlsrs = self.rotcurve_module.calc_vlsr(
                 self.glong_grid, self.glat, self.dist_grid,
