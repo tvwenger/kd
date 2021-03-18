@@ -42,16 +42,20 @@ __Ustd = 10.27
 __Vstd = 15.32
 __Wstd = 7.74
 
-# Reid+2019 Galactocentric radius and solar motion parameters
-__R0 = 8.15 # kpc
-__Usun = 10.6 # km/s
-__Vsun = 10.7 # km/s
-__Wsun = 7.6 # km/s
+# CW21 A6 rotation model parameters
+__R0 = 8.1746  # kpc
+__Usun = 10.879  # km/s
+__Vsun = 10.697  # km/s
+__Wsun = 8.088   # km/s
+__Zsun = 5.399   # pc
+__roll = -0.011  # deg
 
-def calc_Rgal(glong, glat, dist, R0=__R0):
+
+def calc_Rgal(glong, glat, dist, R0=__R0,
+              Zsun=__Zsun, roll=__roll, use_Zsunroll=False):
     """
     Return the Galactocentric radius of an object with a given
-    Galacitic longitude, latitude, and distance.
+    Galactic longitude, latitude, and distance.
 
     Parameters:
       glong, glat :: scalars or arrays of scalars
@@ -61,22 +65,47 @@ def calc_Rgal(glong, glat, dist, R0=__R0):
         line-of-sight distance (kpc).
 
       R0 :: scalar (optional)
-        Galactocentric radius of the Sun.
+        Galactocentric radius of the Sun (kpc).
+
+      Zsun :: scalar (optional)
+        Height of Sun above galactic midplane (pc).
+
+      roll :: scalar (optional)
+        Roll angle relative to b=0 (deg).
+
+      use_Zsunroll :: boolean (optional)
+        If True, include Zsun and roll into calculation.
 
     Returns: R
       Rgal :: scalar or array of scalars
         Galactocentric radius (kpc).
     """
-    #
-    # law of cosines
-    #
-    dist_cos_glat = dist*np.cos(np.deg2rad(glat))
-    Rgal2 = R0**2. + dist_cos_glat**2.
-    Rgal2 = Rgal2 - 2.*R0*dist_cos_glat*np.cos(np.deg2rad(glong))
-    Rgal = np.sqrt(Rgal2)
+    if use_Zsunroll:
+        # useful values
+        tilt = 0.001 * (Zsun / R0)  # tilt of galactic midplane
+        cos_glat = np.cos(np.deg2rad(glat))
+        cos_roll = np.cos(np.deg2rad(roll))
+        sin_roll = np.sin(np.deg2rad(roll))
+        # barycentric frame
+        Xb = dist * cos_glat * np.cos(np.deg2rad(glong))
+        Yb = dist * cos_glat * np.sin(np.deg2rad(glong))
+        Zb = dist * np.sin(np.deg2rad(glat))
+        # galactocentric frame
+        Xg = (Xb - R0) * np.cos(np.deg2rad(tilt)) + \
+             (sin_roll * Yb + cos_roll * Zb) * np.sin(np.deg2rad(tilt))
+        Yg = Yb * cos_roll - sin_roll * Zb
+        Rgal = np.sqrt(Xg * Xg + Yg * Yg)
+    else:
+        # law of cosines
+        dist_cos_glat = dist*np.cos(np.deg2rad(glat))
+        Rgal2 = R0**2. + dist_cos_glat**2.
+        Rgal2 = Rgal2 - 2.*R0*dist_cos_glat*np.cos(np.deg2rad(glong))
+        Rgal = np.sqrt(Rgal2)
+
     return Rgal
 
-def calc_az(glong, glat, dist, R0=__R0):
+def calc_az(glong, glat, dist, R0=__R0,
+            Zsun=__Zsun, roll=__roll, use_Zsunroll=False):
     """
     Return the Galactocentric azimuth of an object with a given
     Galacitic longitude, latitude, and distance. Galactocentric
@@ -93,6 +122,15 @@ def calc_az(glong, glat, dist, R0=__R0):
       R0 :: scalar (optional)
         Galactocentric radius of the Sun.
 
+      Zsun :: scalar (optional)
+        Height of Sun above galactic midplane (pc).
+
+      roll :: scalar (optional)
+        Roll angle relative to b=0 (deg).
+
+      use_Zsunroll :: boolean (optional)
+        If True, include Zsun and roll into calculation.
+
     Returns: az
       az :: scalar or array of scalars
         Galactocentric azimuth (degs).
@@ -102,21 +140,31 @@ def calc_az(glong, glat, dist, R0=__R0):
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     # ensure longitude range [0,360) degrees
     glong = glong % 360.
-    #
-    # Compute Rgal
-    #
-    Rgal = calc_Rgal(glong, glat, dist, R0=R0)
-    #
-    # law of cosines
-    #
-    dist_cos_glat = dist*np.cos(np.deg2rad(glat))
-    cos_az = (R0**2. + Rgal**2. - dist_cos_glat**2.)/(2.*Rgal*R0)
-    #
-    # Catch fringe cases
-    #
-    cos_az[cos_az > 1.] = 1.
-    cos_az[cos_az < -1.] = -1.
-    az = np.rad2deg(np.arccos(cos_az))
+    if use_Zsunroll:
+        # useful values
+        tilt = 0.001 * (Zsun / R0)  # tilt of galactic midplane
+        cos_glat = np.cos(np.deg2rad(glat))
+        cos_roll = np.cos(np.deg2rad(roll))
+        sin_roll = np.sin(np.deg2rad(roll))
+        # barycentric frame
+        Xb = dist * cos_glat * np.cos(np.deg2rad(glong))
+        Yb = dist * cos_glat * np.sin(np.deg2rad(glong))
+        Zb = dist * np.sin(np.deg2rad(glat))
+        # galactocentric frame
+        Xg = (Xb - R0) * np.cos(np.deg2rad(tilt)) + \
+             (sin_roll * Yb + cos_roll * Zb) * np.sin(np.deg2rad(tilt))
+        Yg = Yb * cos_roll - sin_roll * Zb
+        az = np.rad2deg(np.arctan2(Yg, -Xg)) % 360.
+    else:
+        # Compute Rgal
+        Rgal = calc_Rgal(glong, glat, dist, R0=R0)
+        # law of cosines
+        dist_cos_glat = dist*np.cos(np.deg2rad(glat))
+        cos_az = (R0**2. + Rgal**2. - dist_cos_glat**2.)/(2.*Rgal*R0)
+        # Catch fringe cases
+        cos_az[cos_az > 1.] = 1.
+        cos_az[cos_az < -1.] = -1.
+        az = np.rad2deg(np.arccos(cos_az))
     #
     # Correct azimuth in 3rd and 4th quadrants
     #

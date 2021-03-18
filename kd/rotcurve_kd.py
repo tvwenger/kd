@@ -164,10 +164,19 @@ class Worker:
         near_dists[near_idxs == -1] = np.nan
         far_dists = self.dists[far_idxs]
         far_dists[far_idxs == -1] = np.nan
-        Rgal = kd_utils.calc_Rgal(
-            self.glong, self.glat, far_dists.T, R0=params['R0']).T
-        Rtan = kd_utils.calc_Rgal(
-            self.glong, self.glat, tan_dists.T, R0=params['R0']).T
+        if self.rotcurve == "cw21_rotcurve":
+            # Include (potentially resampled) Zsun and roll values
+            Rgal = kd_utils.calc_Rgal(
+                self.glong, self.glat, far_dists.T, R0=params['R0'],
+                Zsun=params['Zsun'], roll=params['roll'], use_Zsunroll=True).T
+            Rtan = kd_utils.calc_Rgal(
+                self.glong, self.glat, tan_dists.T, R0=params['R0'],
+                Zsun=params['Zsun'], roll=params['roll'], use_Zsunroll=True).T
+        else:
+            Rgal = kd_utils.calc_Rgal(
+                self.glong, self.glat, far_dists.T, R0=params['R0']).T
+            Rtan = kd_utils.calc_Rgal(
+                self.glong, self.glat, tan_dists.T, R0=params['R0']).T
         return (tan_dists, near_dists, far_dists, vlsr_tan, Rgal, Rtan)
 
 def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,

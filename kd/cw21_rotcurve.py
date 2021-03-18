@@ -67,7 +67,8 @@ __Wstd = 7.74
 #     Vpec_var_threshold = file["Vpec_var_threshold"]
 
 
-def calc_gcen_coords(glong, glat, dist, R0=__R0):
+def calc_gcen_coords(glong, glat, dist, R0=__R0,
+                     Zsun=__Zsun, roll=__roll, use_Zsunroll=True):
     """
     Calculate galactocentric Cartesian coordinates from
     galactic longitudes, latitudes, and distances from the Sun.
@@ -82,6 +83,15 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
       R0 :: scalar or array of scalars (optional)
         Galactocentric radius of the Sun
 
+      Zsun :: scalar (optional)
+        Height of Sun above galactic midplane (pc)
+
+      roll :: scalar (optional)
+        Roll angle relative to b=0 (deg)
+
+      use_Zsunroll :: boolean (optional)
+        If True, include Zsun and roll into calculation
+
       Returns: x, y
         x, y :: scalar or array of scalars
           Galactocentric Cartesian x- and y-coordinates
@@ -89,9 +99,13 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0):
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     if np.shape(glong) != np.shape(dist):
         glong = np.array([glong, ] * len(dist))
-    Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
+    Rgal = kd_utils.calc_Rgal(
+        glong, glat, dist, R0=__R0,
+        Zsun=__Zsun, roll=__roll, use_Zsunroll=use_Zsunroll)
     Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
-    az = kd_utils.calc_az(glong, glat, dist, R0=R0)
+    az = kd_utils.calc_az(
+        glong, glat, dist, R0=__R0,
+        Zsun=__Zsun, roll=__roll, use_Zsunroll=use_Zsunroll)
     cos_az = np.cos(np.deg2rad(az))
     sin_az = np.sin(np.deg2rad(az))
 
@@ -213,7 +227,9 @@ def nominal_params(glong=None, glat=None, dist=None,
     """
     if use_kriging and glong is not None and glat is not None and dist is not None:
         # Calculate galactocentric positions
-        x, y, Rgal, cos_az, sin_az = calc_gcen_coords(glong, glat, dist, R0=__R0)
+        x, y, Rgal, cos_az, sin_az = calc_gcen_coords(
+            glong, glat, dist,
+            R0=__R0, Zsun=__Zsun, roll=__roll, use_Zsunroll=True)
         # Calculate individual Upec and Vpec at source location(s)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
             x, y, krige, Upec_var_threshold, Vpec_var_threshold,
@@ -436,9 +452,11 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     if Rgal is None or cos_az is None or sin_az is None:
         # print("Calculating Rgal in calc_vlsr")
         # Convert distance to Galactocentric, catch small Rgal
-        Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
+        Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0,
+                                  Zsun=Zsun, roll=roll, use_Zsunroll=True)
         Rgal[Rgal < 1.0e-6] = 1.0e-6  # Catch small Rgal
-        az = kd_utils.calc_az(glong, glat, dist, R0=R0)
+        az = kd_utils.calc_az(glong, glat, dist, R0=R0,
+                              Zsun=Zsun, roll=roll, use_Zsunroll=True)
         cos_az = np.cos(np.deg2rad(az))
         sin_az = np.sin(np.deg2rad(az))
     # print("Rgal, cos_az, sin_az in calc_vlsr", np.shape(Rgal), np.shape(cos_az), np.shape(sin_az))

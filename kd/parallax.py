@@ -31,16 +31,22 @@ import pathos.multiprocessing as mp
 
 from kd import kd_utils
 
-# Solar Galactocentric radius and error from Reid+2019
-__R0 = 8.15 # kpc
-__R0_err = 0.15 # kpc
+# CW21 A6 best-fit parameters and errors
+__R0 = 8.1746    # kpc
+__R0_err = 0.026 # kpc
+__Zsun = 5.399   # pc
+__Zsun_err = 10. # pc
+__roll = -0.011  # deg
+__roll_err = 0.1 # deg
+# TODO: update errors
+
 
 class Worker:
     """
     Multiprocessing wrapper class
     """
-    def __init__(self, glong, plx, plx_err, dist_max,
-                 resample, size, R0, R0_err):
+    def __init__(self, glong, plx, plx_err, dist_max, resample, size,
+                 R0, R0_err, Zsun, Zsun_err, roll, roll_err):
         self.glong = glong
         self.plx = plx
         self.plx_err = plx_err
@@ -49,6 +55,10 @@ class Worker:
         self.size = size
         self.R0 = R0
         self.R0_err = R0_err
+        self.Zsun = Zsun
+        self.Zsun_err = Zsun_err
+        self.roll = roll
+        self.roll_err = roll_err
 
     def work(self, snum):
         #
@@ -56,16 +66,22 @@ class Worker:
         #
         np.random.seed()
         #
-        # Resample parallax and R0
+        # Resample parallax, R0, Zsun, and roll
         #
         if self.resample:
             plx_sample = np.random.normal(
                 loc=self.plx, scale=self.plx_err)
             R0_sample = np.random.normal(
                 loc=self.R0, scale=self.R0_err)
+            Zsun_sample = np.random.normal(
+                loc=self.Zsun, scale=self.Zsun_err)
+            roll_sample = np.random.normal(
+                loc=self.roll, scale=self.roll_err)
         else:
             plx_sample = self.plx
             R0_sample = self.R0
+            Zsun_sample = self.Zsun
+            roll_sample = self.roll
         #
         # Compute distances from parallax, catch large distances
         #
@@ -74,12 +90,16 @@ class Worker:
         distance[distance < 0.] = np.nan
         #
         # Compute Galactocentric radius
+        # ? Are we assuming latitude of zero?
         #
-        Rgal = kd_utils.calc_Rgal(self.glong, distance, R0=R0_sample)
+        Rgal = kd_utils.calc_Rgal(
+            self.glong, 0., distance, R0=R0_sample,
+            Zsun=Zsun_sample, roll=roll_sample, use_Zsunroll=True)
         return (distance, Rgal)
 
 def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
-             R0_err=__R0_err, resample=False, size=1):
+             R0_err=__R0_err, resample=False, size=1, Zsun=__Zsun,
+             Zsun_err=__Zsun_err, roll=__roll, roll_err=__roll_err):
     """
     Compute parallax distance and Galactocentric radius for a given
     Galactic longitude and parallax.
@@ -101,6 +121,12 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
 
       R0, R0_err :: scalar (optional)
         Solar Galactocentric radius and uncertainty (kpc)
+
+      Zsun, Zsun_err :: scalar (optional)
+        Height of Sun above galactic midplane and uncertainty (pc).
+
+      roll, roll_err :: scalar (optional)
+        Roll angle relative to b=0 and uncertainty (deg).
 
     Returns: output
       output["Rgal"] :: scalar or array of scalars
@@ -138,8 +164,8 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
     #
     # Initialize worker
     #
-    worker = Worker(glong, plx, plx_err, dist_max,
-                    resample, size, R0, R0_err)
+    worker = Worker(glong, plx, plx_err, dist_max, resample, size,
+                    R0, R0_err, Zsun, Zsun_err, roll, roll_err)
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))
     #
