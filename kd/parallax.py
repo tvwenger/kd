@@ -39,6 +39,7 @@ __Zsun_err = 10. # pc
 __roll = -0.011  # deg
 __roll_err = 0.1 # deg
 # TODO: update errors
+# TODO: add nodes as argument
 
 
 class Worker:

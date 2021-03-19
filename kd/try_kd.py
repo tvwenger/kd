@@ -23,6 +23,7 @@ dist = pdf_kd.pdf_kd(
     glong, glat, velo, velo_err=velo_err, rotcurve=rotcurve, num_samples=num_samples,
     peculiar=peculiar,
     # use_kriging=use_kriging
+    processes=1
 )
 end = time.time()
 
@@ -38,7 +39,8 @@ end = time.time()
 # start = time.time()
 # dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
 #                                peculiar=True,
-#                                use_kriging=True
+#                                use_kriging=True,
+#                                nodes=1
 #                                )
 # end = time.time()
 

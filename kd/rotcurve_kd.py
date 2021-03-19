@@ -182,7 +182,7 @@ class Worker:
 def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
                 rotcurve='cw21_rotcurve',
                 dist_res=0.001, dist_min=0.001, dist_max=30.,
-                resample=False, size=1,
+                resample=False, size=1, processes=None,
                 peculiar=False, use_kriging=False):
     """
     Return the kinematic near, far, and tanget distance for a
@@ -229,14 +229,18 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
       size :: integer (optional)
         if resample is True, generate this many samples
 
+      processes :: integer (optional)
+        number of simultaneous workers to use
+        if None, automatically assign workers based on system's core count
+
       peculiar :: boolean (optional)
-        Only supported for "cw21_rotcurve" and "reid19_rotcurve"
-        If True, include HMSFR peculiar motion component
+        only supported for "cw21_rotcurve" and "reid19_rotcurve"
+        if True, include HMSFR peculiar motion component
 
       use_kriging :: boolean (optional)
-        Only supported for rotcurve = "cw21_rotcurve"
-        If True, estimate individual Upec & Vpec from kriging program
-        If False, use average Upec & Vpec
+        only supported for rotcurve = "cw21_rotcurve"
+        if True, estimate individual Upec & Vpec from kriging program
+        if False, use average Upec & Vpec
 
     Returns: output
       output["Rgal"] :: scalar or array of scalars
@@ -304,10 +308,19 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
     #
     worker = Worker(glong, glat, velo, velo_err, dists, glong_grid, dist_grid,
                     velo_tol, rotcurve, resample, size, peculiar, use_kriging)
-    with mp.Pool() as pool:
+    # if nodes is None:
+    #     with mp.ProcessPool() as pool:
+    #         print("Number of rotcurve_kd nodes:", pool.nodes)
+    #         results = pool.map(worker.work, range(size))
+    # else:
+    #     with mp.ProcessPool(nodes=nodes) as pool:
+    #         print("Number of rotcurve_kd nodes:", pool.nodes)
+    #         results = pool.map(worker.work, range(size))
+    with mp.Pool(processes=processes) as pool:
+        print("Number of rotcurve_kd nodes:", pool._processes)
         results = pool.map(worker.work, range(size))
     # Free memory even though pool should be closed already
-    print("Closing pool in rotcurve_kd_old")
+    print("Closing pool in rotcurve_kd")
     pool.close()
     pool.join()
     #

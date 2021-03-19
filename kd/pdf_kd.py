@@ -44,7 +44,7 @@ def calc_hpd_wrapper(args):
 
 def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
            rotcurve_dist_res=0.001, rotcurve_dist_max=30.,
-           pdf_bins=1000, num_samples=10000,
+           pdf_bins=1000, num_samples=10000, processes=None,
            plot_pdf=False, plot_prefix='pdf_',
            peculiar=False, use_kriging=False):
     """
@@ -83,6 +83,10 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
 
       num_samples :: integer (optional)
         Number of MC samples to use when generating PDF
+
+      processes :: integer (optional)
+        Number of simultaneous workers to use
+        If None, automatically assign workers based on system's core count
 
       plot_pdf :: bool (optional)
         If True, plot each PDF. Filenames are:
@@ -190,7 +194,7 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
         glong, glat, velo, velo_err=velo_err, velo_tol=0.1,
         rotcurve=rotcurve, dist_res=rotcurve_dist_res, dist_min=0.01,
         dist_max=rotcurve_dist_max, resample=True, size=num_samples,
-        peculiar=peculiar, use_kriging=use_kriging)
+        processes=processes, peculiar=peculiar, use_kriging=use_kriging)
     #
     # Set up multiprocessing for fitting KDEs
     #
@@ -218,7 +222,8 @@ def pdf_kd(glong, glat, velo, velo_err=None, rotcurve='cw21_rotcurve',
     # Get results
     #
     nresult = 0
-    with mp.Pool() as pool:
+    with mp.Pool(processes=processes) as pool:
+        print("Number of pdf_kd processes:", pool._processes)
         kde_results = pool.map(calc_hpd_wrapper, args)
     print("Closing pool in pdf_kd")
     pool.close()

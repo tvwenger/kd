@@ -37,6 +37,10 @@ from kd.kd_utils import calc_hpd
 __R0 = 8.15 # kpc
 __R0_err = 0.15 # kpc
 
+# TODO: add nodes as argument
+# TODO: add support for Zsun and roll
+
+
 def calc_hpd_wrapper(args):
     """
     Multiprocessing wrapper from KDE results.
