@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 """
-cw21_rotcurve_old.py
-
-OLD FILE THAT HAS MEMORY LEAK ISSUE.
+cw21_rotcurve.py
 
 Utilities involving the Universal Rotation Curve (Persic 1996) from
-Cheng & Wenger (2021), henceforth CW21, with re-done analysis by CW21.
+Cheng & Wenger (2021), henceforth CW21.
 Including HMSFR peculiar motion.
 
 Copyright(C) 2017-2021 by
@@ -26,9 +24,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-2021-03-03 Trey V. Wenger new in V2.0
+2021-03-DD Isaac Cheng & Trey V. Wenger new in V___?
 """
 
+import os
+import dill
 import numpy as np
 from kd import kd_utils
 
@@ -163,6 +163,15 @@ def krige_UpecVpec(x, y, krige, Upec_var_threshold, Vpec_var_threshold,
       Vpec_var :: array of scalars
         Variance of Vpec (km^2/s^2)
     """
+    # krigefile contains: full KDE + KDEs of each component (e.g. "R0", "Zsun", etc.)
+    #                     + kriging function + kriging thresholds
+    krigefile = os.path.join(os.path.dirname(__file__), "cw21_kde_krige.pkl")
+    with open(krigefile, "rb") as f:
+        file = dill.load(f)
+        krige = file["krige"]
+        Upec_var_threshold = file["Upec_var_threshold"]
+        Vpec_var_threshold = file["Vpec_var_threshold"]
+
     # Switch to convention used in kriging map
     # (Rotate 90 deg CW, Sun is on +y-axis)
     x, y = y, -x
