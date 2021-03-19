@@ -442,7 +442,9 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
       vlsr :: scalar or array of scalars
         LSR velocity (km/s).
     """
-    print("glong, glat, dist in calc_vlsr", np.shape(glong), np.shape(glat), np.shape(dist))
+    is_print = False
+    if is_print:
+        print("glong, glat, dist in calc_vlsr", np.shape(glong), np.shape(glat), np.shape(dist))
     input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     cos_glong = np.cos(np.deg2rad(glong))
@@ -461,14 +463,16 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
                               Zsun=Zsun, roll=roll, use_Zsunroll=True)
         cos_az = np.cos(np.deg2rad(az))
         sin_az = np.sin(np.deg2rad(az))
-    print("Rgal, cos_az, sin_az in calc_vlsr", np.shape(Rgal), np.shape(cos_az), np.shape(sin_az))
+    if is_print:
+        print("Rgal, cos_az, sin_az in calc_vlsr", np.shape(Rgal), np.shape(cos_az), np.shape(sin_az))
     #
     # Rotation curve circular velocity
     #
     theta = calc_theta(Rgal, a2=a2, a3=a3, R0=R0)
     theta0 = calc_theta(R0, a2=a2, a3=a3, R0=R0)
-    print("Theta, theta0 in calc_vlsr", np.shape(theta), np.shape(theta0))
-    print("Upec, Vpec in calc_vlsr", np.shape(Upec), np.shape(Vpec))
+    if is_print:
+        print("Theta, theta0 in calc_vlsr", np.shape(theta), np.shape(theta0))
+        print("Upec, Vpec in calc_vlsr", np.shape(Upec), np.shape(Vpec))
     #
     # Add HMSFR peculiar motion
     #
@@ -483,14 +487,16 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vXg = -vR * cos_az + vAz * sin_az
     vYg = vR * sin_az + vAz * cos_az
     vZg = vZ
-    print("1st vXg, vYg, vZg in calc_vlsr", np.shape(vXg), np.shape(vYg), np.shape(vZg))
+    if is_print:
+        print("1st vXg, vYg, vZg in calc_vlsr", np.shape(vXg), np.shape(vYg), np.shape(vZg))
     #
     # Convert to barycentric
     #
     X = dist * cos_glat * cos_glong
     Y = dist * cos_glat * sin_glong
     Z = dist * sin_glat
-    print("X, Y, Z in calc_vlsr", np.shape(X), np.shape(Y), np.shape(Z))
+    if is_print:
+        print("X, Y, Z in calc_vlsr", np.shape(X), np.shape(Y), np.shape(Z))
     # useful constants
     sin_tilt = Zsun / 1000.0 / R0
     cos_tilt = np.cos(np.arcsin(sin_tilt))
@@ -500,7 +506,8 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vXg = vXg - Usun
     vYg = vYg - theta0 - Vsun
     vZg = vZg - Wsun
-    print("2nd vXg, vYg, vZg in calc_vlsr", np.shape(vXg), np.shape(vYg), np.shape(vZg))
+    if is_print:
+        print("2nd vXg, vYg, vZg in calc_vlsr", np.shape(vXg), np.shape(vYg), np.shape(vZg))
     # correct tilt and roll of Galactic midplane
     vXg1 = vXg * cos_tilt - vZg * sin_tilt
     vYg1 = vYg
@@ -509,7 +516,8 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     vYh = vYg1 * cos_roll + vZg1 * sin_roll
     vZh = -vYg1 * sin_roll + vZg1 * cos_roll
     vbary = (X * vXh + Y * vYh + Z * vZh) / dist
-    print("vbary in calc_vlsr", np.shape(vbary))
+    if is_print:
+        print("vbary in calc_vlsr", np.shape(vbary))
     #
     # Convert to IAU-LSR
     #
@@ -518,5 +526,6 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     )
     if input_scalar:
         return vlsr[0]
-    print("final vlsr shape", np.shape(vlsr))
+    if is_print:
+        print("final vlsr shape", np.shape(vlsr))
     return vlsr
