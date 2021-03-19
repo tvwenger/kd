@@ -141,11 +141,11 @@ class Worker:
         #
         near_idxs = np.array([
             np.argmin(np.abs(vlsr[:tan_idx]-v)) if
-            (tan_idx != -1 and np.min(np.abs(vlsr[:tan_idx]-v)) < self.velo_tol)
+            (tan_idx > 0 and np.min(np.abs(vlsr[:tan_idx]-v)) < self.velo_tol)
             else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
         far_idxs = np.array([
             tan_idx+np.argmin(np.abs(vlsr[tan_idx:]-v)) if
-            (tan_idx != -1 and np.min(np.abs(vlsr[tan_idx:]-v)) < self.velo_tol)
+            (tan_idx > 0 and np.min(np.abs(vlsr[tan_idx:]-v)) < self.velo_tol)
             else np.argmin(np.abs(vlsr-v)) if
             (tan_idx == -1 and np.min(np.abs(vlsr-v)) < self.velo_tol)
             else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
@@ -153,7 +153,7 @@ class Worker:
         # Get VLSR of tangent point
         #
         vlsr_tan = np.array([
-            vlsr[tan_idx] if tan_idx != -1 else np.nan
+            vlsr[tan_idx] if tan_idx > 0 else np.nan
             for vlsr, tan_idx in zip(grid_vlsrs.T, tan_idxs)])
         #
         # Get distances
