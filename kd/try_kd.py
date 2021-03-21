@@ -1,48 +1,48 @@
 import time
 import numpy as np
 
-from kd import pdf_kd
-# glong = 30.0  # Galactic longitude, degrees
-# glat = 1.0  # Galactic latitude, degrees
-# velo = 20.0  # measured LSR velocity, km/s
-# velo_err = 5.0  # measured LSR velocity uncertainty, km/s
-# glong = np.array([30., 35.])
-# glat = np.array([1., 0.5])
-# velo = np.array([20., 12.])
-# velo_err = np.array([5., 10.])
-glong = np.random.normal(loc=30., scale=2., size=20)
-glat = np.random.normal(loc=0., scale=0.5, size=20)
-velo = np.random.normal(loc=20., scale=20., size=20)
-velo_err = 10.
-rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
-num_samples = 100  # number of re-samples
-peculiar=True
-use_kriging=True
-start = time.time()
-dist = pdf_kd.pdf_kd(
-    glong, glat, velo, velo_err=velo_err, rotcurve=rotcurve, num_samples=num_samples,
-    peculiar=peculiar,
-    # use_kriging=use_kriging
-    processes=1
-)
-end = time.time()
-
-# from kd import rotcurve_kd
-# glong = 30.0  # Galactic longitude, degrees
-# glat = 1.0  # Galactic latitude, degrees
-# velo = 20.0  # measured LSR velocity, km/s
+# from kd import pdf_kd
+# # glong = 30.0  # Galactic longitude, degrees
+# # glat = 1.0  # Galactic latitude, degrees
+# # velo = 20.0  # measured LSR velocity, km/s
+# # velo_err = 5.0  # measured LSR velocity uncertainty, km/s
 # # glong = np.array([30., 35.])
 # # glat = np.array([1., 0.5])
 # # velo = np.array([20., 12.])
-# velo_tol = 0.1  # tolerance to determine a "match" between rotation curve and measured LSR velocity (km/s)
+# # velo_err = np.array([5., 10.])
+# glong = np.random.normal(loc=30., scale=2., size=5)
+# glat = np.random.normal(loc=0., scale=0.5, size=5)
+# velo = np.random.normal(loc=20., scale=20., size=5)
+# velo_err = 10.
 # rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
+# num_samples = 100  # number of re-samples
+# peculiar=True
+# use_kriging=True
 # start = time.time()
-# dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
-#                                peculiar=True,
-#                                use_kriging=True,
-#                                nodes=1
-#                                )
+# dist = pdf_kd.pdf_kd(
+#     glong, glat, velo, velo_err=velo_err, rotcurve=rotcurve, num_samples=num_samples,
+#     peculiar=peculiar,
+#     use_kriging=use_kriging,
+#     processes=None
+# )
 # end = time.time()
+
+from kd import rotcurve_kd
+glong = 30.0  # Galactic longitude, degrees
+glat = 1.0  # Galactic latitude, degrees
+velo = 20.0  # measured LSR velocity, km/s
+# glong = np.array([30., 35.])
+# glat = np.array([1., 0.5])
+# velo = np.array([20., 12.])
+velo_tol = 0.1  # tolerance to determine a "match" between rotation curve and measured LSR velocity (km/s)
+rotcurve = "cw21_rotcurve"  # the name of the script containing the rotation curve
+start = time.time()
+dist = rotcurve_kd.rotcurve_kd(glong, glat, velo, velo_tol=velo_tol, rotcurve=rotcurve,
+                               peculiar=True,
+                               use_kriging=True,
+                               processes=None
+                               )
+end = time.time()
 
 print(dist)
 print(end - start)

@@ -68,25 +68,10 @@ class Worker:
             # infile contains: full KDE + KDEs of each component (e.g. "R0")
             #                  + kriging function + kriging thresholds
             with open(infile, "rb") as f:
-                file = dill.load(f)
-                self.kde = file["full"]
-                # if use_kriging:
-                #     krige = file["krige"]
-                #     Upec_var_threshold = file["Upec_var_threshold"]
-                #     Vpec_var_threshold = file["Vpec_var_threshold"]
-                # else:
-                #     krige = None
-                #     Upec_var_threshold = Vpec_var_threshold = None
-                krige = Upec_var_threshold = Vpec_var_threshold = None
-                file = None  # free up resources
+                self.kde = dill.load(f)["full"]
             (self.nominal_params, self.Rgal,
              self.cos_az, self.sin_az) = self.rotcurve_module.nominal_params(
-                glong=glong, glat=glat, dist=dist_grid, krige=krige,
-                Upec_var_threshold=Upec_var_threshold,
-                Vpec_var_threshold=Vpec_var_threshold,
-                use_kriging=use_kriging)
-            # Free up resources
-            krige = Upec_var_threshold = Vpec_var_threshold = None
+                glong=glong, glat=glat, dist=dist_grid, use_kriging=use_kriging)
         elif not use_kriging:
             self.nominal_params = self.rotcurve_module.nominal_params()
             self.Rgal = self.cos_az = self.sin_az = None
@@ -107,6 +92,8 @@ class Worker:
                     self.kde, size=len(self.glong),
                     nom_params=self.nominal_params,
                     use_kriging=self.use_kriging)
+                # Allow calculation of Rgal & az with new params
+                self.Rgal = self.cos_az = self.sin_az = None
             else:
                 params = self.rotcurve_module.resample_params(
                     size=len(self.glong))

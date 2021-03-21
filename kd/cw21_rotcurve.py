@@ -92,9 +92,15 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0,
       use_Zsunroll :: boolean (optional)
         If True, include Zsun and roll into calculation
 
-      Returns: x, y
-        x, y :: scalar or array of scalars
-          Galactocentric Cartesian x- and y-coordinates
+    Returns: x, y, Rgal, cos_az, sin_az
+      x, y :: scalar or array of scalars
+        Galactocentric Cartesian x- and y-coordinates
+
+      Rgal :: scalar or array of scalars
+        Galactocentric cylindrical radius (kpc)
+
+      cos_az, sin_az :: scalar or array of scalars
+        Cosine and sine of Galactocentric azimuth (rad)
     """
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     print("R0, Zsun, roll shape:", np.shape(R0), np.shape(Zsun), np.shape(roll))
@@ -117,8 +123,7 @@ def calc_gcen_coords(glong, glat, dist, R0=__R0,
     return x, y, Rgal, cos_az, sin_az
 
 
-def krige_UpecVpec(x, y, krige, Upec_var_threshold, Vpec_var_threshold,
-                   Upec_avg=__Upec, Vpec_avg=__Vpec,
+def krige_UpecVpec(x, y, Upec_avg=__Upec, Vpec_avg=__Vpec,
                    var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var):
     """
     Estimates the peculiar radial velocity (positive toward GC) and
@@ -129,15 +134,6 @@ def krige_UpecVpec(x, y, krige, Upec_var_threshold, Vpec_var_threshold,
     Parameters:
       x, y :: scalars or arrays of scalars
         Galactocentric Cartesian positions (kpc)
-
-      krige :: function
-        Kriging function that takes in parameters (x, y) to evaluate peculiar
-        motions at the given coordinate(s) (i.e. tvw's kriging program)
-
-      Upec_var_threshold, Vpec_var_threshold :: scalars
-        Maximum variance of Upec and Vpec allowed by kriging.
-        If the Upec and Vpec from kriging have variances larger than this,
-        this function will use the average Upec and Vpec instead
 
       Upec_avg :: scalar (optional)
         Average peculiar motion of HMSFRs toward galactic center (km/s)
@@ -171,6 +167,7 @@ def krige_UpecVpec(x, y, krige, Upec_var_threshold, Vpec_var_threshold,
         krige = file["krige"]
         Upec_var_threshold = file["Upec_var_threshold"]
         Vpec_var_threshold = file["Vpec_var_threshold"]
+        file = None  # free up resources
 
     # Switch to convention used in kriging map
     # (Rotate 90 deg CW, Sun is on +y-axis)
@@ -197,9 +194,7 @@ def krige_UpecVpec(x, y, krige, Upec_var_threshold, Vpec_var_threshold,
     return Upec, Upec_var, Vpec, Vpec_var
 
 
-def nominal_params(glong=None, glat=None, dist=None,
-                   krige=None, Upec_var_threshold=None, Vpec_var_threshold=None,
-                   use_kriging=False):
+def nominal_params(glong=None, glat=None, dist=None, use_kriging=False):
     """
     Return a dictionary containing the nominal rotation curve
     parameters.
@@ -210,16 +205,6 @@ def nominal_params(glong=None, glat=None, dist=None,
 
       dist :: scalar or array of scalars (optional, required for kriging)
         Line-of-sight distance (kpc)
-
-      krige :: function (optional, required for kriging)
-        Kriging function that takes in parameters (x, y) to evaluate peculiar
-        motions at the given coordinate(s) (i.e. tvw's kriging program)
-
-      Upec_var_threshold, Vpec_var_threshold :: scalars (optional,
-                                                         required for kriging)
-        Maximum variance of Upec and Vpec allowed by kriging.
-        If the Upec and Vpec from kriging have variances larger than this,
-        the program will use the average Upec and Vpec instead
 
       use_kriging :: boolean (optional)
         If True, estimate individual Upec & Vpec from kriging program
@@ -243,8 +228,7 @@ def nominal_params(glong=None, glat=None, dist=None,
             R0=__R0, Zsun=__Zsun, roll=__roll, use_Zsunroll=True)
         # Calculate individual Upec and Vpec at source location(s)
         Upec, Upec_var, Vpec, Vpec_var = krige_UpecVpec(
-            x, y, krige, Upec_var_threshold, Vpec_var_threshold,
-            Upec_avg=__Upec, Vpec_avg=__Vpec,
+            x, y, Upec_avg=__Upec, Vpec_avg=__Vpec,
             var_Upec_avg=__Upec_var, var_Vpec_avg=__Vpec_var)
     else:
         # Use average Upec and Vpec
@@ -463,7 +447,7 @@ def calc_vlsr(glong, glat, dist, Rgal=None, cos_az=None, sin_az=None,
     # print("glong shape", np.shape(glong))
     #
     if Rgal is None or cos_az is None or sin_az is None:
-        # print("Calculating Rgal in calc_vlsr")
+        print("Calculating Rgal in calc_vlsr") if is_print else None
         # Convert distance to Galactocentric, catch small Rgal
         Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0,
                                   Zsun=Zsun, roll=roll, use_Zsunroll=True)
