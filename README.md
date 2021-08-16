@@ -1,8 +1,5 @@
 # Kinematic Distance Utilities
-Utilities to calculate kinematic distances and kinematic distance uncertainties. [See Wenger et al. (2018)](http://adsabs.harvard.edu/abs/2018ApJ...856...52W). An on-line tool which uses this code to compute kinematic distances is available here (http://www.treywenger.com/kd/). If you use this work, please reference both the code and the paper:
-1. [Wenger et al. (2018)](http://ui.adsabs.harvard.edu/abs/2018ApJ...856...52W)
-2. https://ascl.net/1712.001
-3. https://zenodo.org/record/1166001
+Utilities to calculate kinematic distances and kinematic distance uncertainties. [See Wenger et al. (2018)](http://adsabs.harvard.edu/abs/2018ApJ...856...52W). An on-line tool which uses this code to compute kinematic distances is available here (http://www.treywenger.com/kd/). If you use this work, please reference https://zenodo.org/record/1166001
 
 ## New in Version 2.0
 0. Re-added multiprocessing to `rotcurve_kd` and `parallax`
