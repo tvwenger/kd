@@ -4,7 +4,7 @@ kd_utils.py
 
 Utility functions for rotcurve_kd.py, pdf_kd.py, and rotation curves.
 
-Copyright(C) 2017-2020 by
+Copyright(C) 2017-2021 by
 Trey V. Wenger; tvwenger@gmail.com
 
 GNU General Public License v3 (GNU GPLv3)

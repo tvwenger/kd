@@ -5,7 +5,7 @@ pdf_kd.py
 Utilities to calculate kinematic distances and kinematic distance
 uncertainties using the Monte Carlo method.
 
-Copyright(C) 2017-2020 by
+Copyright(C) 2017-2021 by
 Trey V. Wenger; tvwenger@gmail.com
 
 GNU General Public License v3 (GNU GPLv3)
