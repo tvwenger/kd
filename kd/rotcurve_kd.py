@@ -33,12 +33,26 @@ import pathos.multiprocessing as mp
 
 from kd import kd_utils
 
+
 class Worker:
     """
     Multiprocessing wrapper class
     """
-    def __init__(self, glong, glat, velo, velo_err, dists, glong_grid,
-                 dist_grid, velo_tol, rotcurve, resample, size):
+
+    def __init__(
+        self,
+        glong,
+        glat,
+        velo,
+        velo_err,
+        dists,
+        glong_grid,
+        dist_grid,
+        velo_tol,
+        rotcurve,
+        resample,
+        size,
+    ):
         self.glong = glong
         self.glat = glat
         self.velo = velo
@@ -52,7 +66,7 @@ class Worker:
         #
         # Get rotation curve module
         #
-        self.rotcurve_module = importlib.import_module('kd.'+rotcurve)
+        self.rotcurve_module = importlib.import_module("kd." + rotcurve)
         #
         # Get nominal rotation curve parameters
         #
@@ -67,10 +81,8 @@ class Worker:
         # Resample velocity and rotation curve parameters
         #
         if self.resample:
-            params = self.rotcurve_module.resample_params(
-                size=len(self.glong))
-            velo_sample = np.random.normal(
-                loc=self.velo, scale=self.velo_err)
+            params = self.rotcurve_module.resample_params(size=len(self.glong))
+            velo_sample = np.random.normal(loc=self.velo, scale=self.velo_err)
         else:
             params = self.nominal_params
             velo_sample = self.velo
@@ -78,32 +90,51 @@ class Worker:
         # Calculate LSR velocity at each (glong, distance) point
         #
         grid_vlsrs = self.rotcurve_module.calc_vlsr(
-            self.glong_grid, self.glat, self.dist_grid, **params)
+            self.glong_grid, self.glat, self.dist_grid, **params
+        )
         #
         # Get index of tangent point along each direction
         #
-        tan_idxs = np.array([
-            np.argmax(vlsr) if l < 90. else np.argmin(vlsr) if l > 270.
-            else -1 for l, vlsr in zip(self.glong, grid_vlsrs.T)])
+        tan_idxs = np.array(
+            [
+                np.argmax(vlsr) if gl < 90.0 else np.argmin(vlsr) if gl > 270.0 else -1
+                for gl, vlsr in zip(self.glong, grid_vlsrs.T)
+            ]
+        )
         #
         # Get index of near and far distances along each direction
         #
-        near_idxs = np.array([
-            np.argmin(np.abs(vlsr[:tan_idx]-v)) if
-            (tan_idx != -1 and np.min(np.abs(vlsr[:tan_idx]-v)) < self.velo_tol)
-            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
-        far_idxs = np.array([
-            tan_idx+np.argmin(np.abs(vlsr[tan_idx:]-v)) if
-            (tan_idx != -1 and np.min(np.abs(vlsr[tan_idx:]-v)) < self.velo_tol)
-            else np.argmin(np.abs(vlsr-v)) if
-            (tan_idx == -1 and np.min(np.abs(vlsr-v)) < self.velo_tol)
-            else -1 for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)])
+        near_idxs = np.array(
+            [
+                np.argmin(np.abs(vlsr[:tan_idx] - v))
+                if (
+                    tan_idx != -1 and np.min(np.abs(vlsr[:tan_idx] - v)) < self.velo_tol
+                )
+                else -1
+                for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)
+            ]
+        )
+        far_idxs = np.array(
+            [
+                tan_idx + np.argmin(np.abs(vlsr[tan_idx:] - v))
+                if (
+                    tan_idx != -1 and np.min(np.abs(vlsr[tan_idx:] - v)) < self.velo_tol
+                )
+                else np.argmin(np.abs(vlsr - v))
+                if (tan_idx == -1 and np.min(np.abs(vlsr - v)) < self.velo_tol)
+                else -1
+                for v, vlsr, tan_idx in zip(velo_sample, grid_vlsrs.T, tan_idxs)
+            ]
+        )
         #
         # Get VLSR of tangent point
         #
-        vlsr_tan = np.array([
-            vlsr[tan_idx] if tan_idx != -1 else np.nan
-            for vlsr, tan_idx in zip(grid_vlsrs.T, tan_idxs)])
+        vlsr_tan = np.array(
+            [
+                vlsr[tan_idx] if tan_idx != -1 else np.nan
+                for vlsr, tan_idx in zip(grid_vlsrs.T, tan_idxs)
+            ]
+        )
         #
         # Get distances
         #
@@ -113,16 +144,24 @@ class Worker:
         near_dists[near_idxs == -1] = np.nan
         far_dists = self.dists[far_idxs]
         far_dists[far_idxs == -1] = np.nan
-        Rgal = kd_utils.calc_Rgal(
-            self.glong, self.glat, far_dists.T, R0=params['R0']).T
-        Rtan = kd_utils.calc_Rgal(
-            self.glong, self.glat, tan_dists.T, R0=params['R0']).T
+        Rgal = kd_utils.calc_Rgal(self.glong, self.glat, far_dists.T, R0=params["R0"]).T
+        Rtan = kd_utils.calc_Rgal(self.glong, self.glat, tan_dists.T, R0=params["R0"]).T
         return (tan_dists, near_dists, far_dists, vlsr_tan, Rgal, Rtan)
 
-def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
-                rotcurve='reid19_rotcurve',
-                dist_res=0.001, dist_min=0.001, dist_max=30.,
-                resample=False, size=1):
+
+def rotcurve_kd(
+    glong,
+    glat,
+    velo,
+    velo_err=None,
+    velo_tol=0.1,
+    rotcurve="reid19_rotcurve",
+    dist_res=0.001,
+    dist_min=0.001,
+    dist_max=30.0,
+    resample=False,
+    size=1,
+):
     """
     Return the kinematic near, far, and tanget distance for a
     given Galactic longitude and LSR velocity assuming
@@ -139,7 +178,7 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
 
       velo_err :: scalar or array of scalars (optional)
         LSR velocity uncertainty (km/s). If it is an array, it must
-        have the same shape as velo. Otherwise, this scalar 
+        have the same shape as velo. Otherwise, this scalar
         uncertainty is applied to all velos.
 
       velo_tol :: scalar (optional)
@@ -162,12 +201,12 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
         distance (kpc)
 
       resample :: bool (optional)
-        if True, use resampled rotation curve parameters and LSR 
+        if True, use resampled rotation curve parameters and LSR
         velocities.
 
       size :: integer (optional)
         if resample is True, generate this many samples
-    
+
     Returns: output
       output["Rgal"] :: scalar or array of scalars
         Galactocentric radius (kpc).
@@ -209,7 +248,7 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
     # check shape of inputs
     if glong.shape != velo.shape or glong.shape != glat.shape:
         raise ValueError("glong, glat, and velo must have same shape")
-    if (velo_err is not None and not np.isscalar(velo_err)):
+    if velo_err is not None and not np.isscalar(velo_err):
         velo_err = velo_err.flatten()
         if velo_err.shape != velo.shape:
             raise ValueError("velo_err must be scalar or have same shape as velo")
@@ -217,34 +256,45 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
     # Default velo_err to 0, sample size to 1
     #
     elif velo_err is None:
-        velo_err = 0.
+        velo_err = 0.0
     if not resample:
         size = 1
     if size < 1:
         raise ValueError("size must be >= 1")
     # ensure range [0,360) degrees
-    glong = glong % 360.
+    glong = glong % 360.0
     #
     # Create array of distances, then grid of (dists, glongs)
     #
-    dists = np.arange(dist_min, dist_max+dist_res, dist_res)
-    dist_grid, glong_grid = np.meshgrid(dists, glong, indexing='ij')
+    dists = np.arange(dist_min, dist_max + dist_res, dist_res)
+    dist_grid, glong_grid = np.meshgrid(dists, glong, indexing="ij")
     #
     # Initialize worker
     #
-    worker = Worker(glong, glat, velo, velo_err, dists, glong_grid, dist_grid,
-                    velo_tol, rotcurve, resample, size)
+    worker = Worker(
+        glong,
+        glat,
+        velo,
+        velo_err,
+        dists,
+        glong_grid,
+        dist_grid,
+        velo_tol,
+        rotcurve,
+        resample,
+        size,
+    )
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))
     #
     # Store results
     #
-    tan_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    near_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    far_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    vlsr_tan_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    Rgal_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    Rtan_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    tan_samples = np.ones((len(glong), size), dtype=float) * np.nan
+    near_samples = np.ones((len(glong), size), dtype=float) * np.nan
+    far_samples = np.ones((len(glong), size), dtype=float) * np.nan
+    vlsr_tan_samples = np.ones((len(glong), size), dtype=float) * np.nan
+    Rgal_samples = np.ones((len(glong), size), dtype=float) * np.nan
+    Rtan_samples = np.ones((len(glong), size), dtype=float) * np.nan
     for snum, result in enumerate(results):
         tan_samples[:, snum] = result[0]
         near_samples[:, snum] = result[1]
@@ -255,10 +305,14 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
     #
     # Convert back to scalars if necessary
     #
-    output = {"Rgal": Rgal_samples, "Rtan": Rtan_samples,
-              "near": near_samples, "far": far_samples,
-              "tangent": tan_samples,
-              "vlsr_tangent": vlsr_tan_samples}
+    output = {
+        "Rgal": Rgal_samples,
+        "Rtan": Rtan_samples,
+        "near": near_samples,
+        "far": far_samples,
+        "tangent": tan_samples,
+        "vlsr_tangent": vlsr_tan_samples,
+    }
     if size == 1:
         for key in output:
             output[key] = np.squeeze(output[key], axis=-1)
@@ -270,5 +324,5 @@ def rotcurve_kd(glong, glat, velo, velo_err=None, velo_tol=0.1,
             if size == 1:
                 output[key] = output[key].reshape(inp_shape)
             else:
-                output[key] = output[key].reshape(inp_shape+(size,))
+                output[key] = output[key].reshape(inp_shape + (size,))
     return output

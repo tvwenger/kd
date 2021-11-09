@@ -43,10 +43,11 @@ __Vstd = 15.32
 __Wstd = 7.74
 
 # Reid+2019 Galactocentric radius and solar motion parameters
-__R0 = 8.15 # kpc
-__Usun = 10.6 # km/s
-__Vsun = 10.7 # km/s
-__Wsun = 7.6 # km/s
+__R0 = 8.15  # kpc
+__Usun = 10.6  # km/s
+__Vsun = 10.7  # km/s
+__Wsun = 7.6  # km/s
+
 
 def calc_Rgal(glong, glat, dist, R0=__R0):
     """
@@ -70,11 +71,12 @@ def calc_Rgal(glong, glat, dist, R0=__R0):
     #
     # law of cosines
     #
-    dist_cos_glat = dist*np.cos(np.deg2rad(glat))
-    Rgal2 = R0**2. + dist_cos_glat**2.
-    Rgal2 = Rgal2 - 2.*R0*dist_cos_glat*np.cos(np.deg2rad(glong))
+    dist_cos_glat = dist * np.cos(np.deg2rad(glat))
+    Rgal2 = R0 ** 2.0 + dist_cos_glat ** 2.0
+    Rgal2 = Rgal2 - 2.0 * R0 * dist_cos_glat * np.cos(np.deg2rad(glong))
     Rgal = np.sqrt(Rgal2)
     return Rgal
+
 
 def calc_az(glong, glat, dist, R0=__R0):
     """
@@ -101,7 +103,7 @@ def calc_az(glong, glat, dist, R0=__R0):
     input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
     glong, glat, dist = np.atleast_1d(glong, glat, dist)
     # ensure longitude range [0,360) degrees
-    glong = glong % 360.
+    glong = glong % 360.0
     #
     # Compute Rgal
     #
@@ -109,21 +111,22 @@ def calc_az(glong, glat, dist, R0=__R0):
     #
     # law of cosines
     #
-    dist_cos_glat = dist*np.cos(np.deg2rad(glat))
-    cos_az = (R0**2. + Rgal**2. - dist_cos_glat**2.)/(2.*Rgal*R0)
+    dist_cos_glat = dist * np.cos(np.deg2rad(glat))
+    cos_az = (R0 ** 2.0 + Rgal ** 2.0 - dist_cos_glat ** 2.0) / (2.0 * Rgal * R0)
     #
     # Catch fringe cases
     #
-    cos_az[cos_az > 1.] = 1.
-    cos_az[cos_az < -1.] = -1.
+    cos_az[cos_az > 1.0] = 1.0
+    cos_az[cos_az < -1.0] = -1.0
     az = np.rad2deg(np.arccos(cos_az))
     #
     # Correct azimuth in 3rd and 4th quadrants
     #
-    az[glong > 180.] = 360. - az[glong > 180.]
+    az[glong > 180.0] = 360.0 - az[glong > 180.0]
     if input_scalar:
         return az[0]
     return az
+
 
 def calc_dist(az, Rgal, Z, R0=__R0):
     """
@@ -150,9 +153,12 @@ def calc_dist(az, Rgal, Z, R0=__R0):
     #
     # law of cosines
     #
-    dist2 = R0**2. + Rgal**2. + Z**2. - 2.*R0*Rgal*np.cos(np.deg2rad(az))
+    dist2 = (
+        R0 ** 2.0 + Rgal ** 2.0 + Z ** 2.0 - 2.0 * R0 * Rgal * np.cos(np.deg2rad(az))
+    )
     dist = np.sqrt(dist2)
     return dist
+
 
 def calc_glong(az, Rgal, R0=__R0):
     """
@@ -181,32 +187,41 @@ def calc_glong(az, Rgal, R0=__R0):
     input_scalar = np.isscalar(az) and np.isscalar(Rgal)
     az, Rgal = np.atleast_1d(az, Rgal)
     # ensure azimuth range [0,360) degrees
-    az = az % 360.
+    az = az % 360.0
     #
     # Compute midplane distance
     #
-    dist = calc_dist(az, Rgal, 0., R0=R0)
+    dist = calc_dist(az, Rgal, 0.0, R0=R0)
     #
     # law of cosines
     #
-    cos_glong = (R0**2. + dist**2. - Rgal**2.)/(2.*dist*R0)
+    cos_glong = (R0 ** 2.0 + dist ** 2.0 - Rgal ** 2.0) / (2.0 * dist * R0)
     #
     # Catch fringe cases
     #
-    cos_glong[cos_glong > 1.] = 1.
-    cos_glong[cos_glong < -1.] = -1.
+    cos_glong[cos_glong > 1.0] = 1.0
+    cos_glong[cos_glong < -1.0] = -1.0
     glong = np.rad2deg(np.arccos(cos_glong))
     #
     # Correct longitude in 3rd and 4th quadrants
     #
-    glong[az > 180.] = 360. - glong[az > 180.]
+    glong[az > 180.0] = 360.0 - glong[az > 180.0]
     if input_scalar:
         return glong[0]
     return glong
 
-def correct_vlsr(glong, glat, vlsr,
-                 Ustd=__Ustd, Vstd=__Vstd, Wstd=__Wstd,
-                 Usun=__Usun, Vsun=__Vsun, Wsun=__Wsun):
+
+def correct_vlsr(
+    glong,
+    glat,
+    vlsr,
+    Ustd=__Ustd,
+    Vstd=__Vstd,
+    Wstd=__Wstd,
+    Usun=__Usun,
+    Vsun=__Vsun,
+    Wsun=__Wsun,
+):
     """
     Return the "corrected" LSR velocity by updating the IAU-defined
     solar motion components.
@@ -242,20 +257,21 @@ def correct_vlsr(glong, glat, vlsr,
     # Compute heliocentric velocity by subtracting IAU defined solar
     # motion components
     #
-    U_part = Ustd*cos_glong
-    V_part = Vstd*sin_glong
-    W_part = Wstd*sin_glat
-    UV_part = (U_part+V_part)*cos_glat
+    U_part = Ustd * cos_glong
+    V_part = Vstd * sin_glong
+    W_part = Wstd * sin_glat
+    UV_part = (U_part + V_part) * cos_glat
     v_helio = vlsr - UV_part - W_part
     #
     # Compute corrected VLSR
     #
-    U_part = Usun*cos_glong
-    V_part = Vsun*sin_glong
-    W_part = Wsun*sin_glat
-    UV_part = (U_part+V_part)*cos_glat
+    U_part = Usun * cos_glong
+    V_part = Vsun * sin_glong
+    W_part = Wsun * sin_glat
+    UV_part = (U_part + V_part) * cos_glat
     corr_vlsr = v_helio + UV_part + W_part
     return corr_vlsr
+
 
 def calc_anderson2012_uncertainty(glong, vlsr):
     """
@@ -280,7 +296,7 @@ def calc_anderson2012_uncertainty(glong, vlsr):
 
     Raises:
       ValueError : if glong and vlsr are not 1-D; or
-                   if glong and vlsr are arrays and 
+                   if glong and vlsr are arrays and
                    not the same size
     """
     input_scalar = np.isscalar(glong)
@@ -290,29 +306,28 @@ def calc_anderson2012_uncertainty(glong, vlsr):
     #
     # Read Anderson+2012 uncertainty data
     #
-    a12file = os.path.join(os.path.dirname(__file__),'curve_data_wise_small.sav')
-    a12data = readsav(a12file,python_dict=True)
-    a12data = a12data['curve_data_wise_small'][0]
-    a12_near_err = a12data['big_percentages_near']/100.
-    a12_far_err = a12data['big_percentages_far']/100.
-    a12_glongs = a12data['glong']
-    a12_vlsrs = a12data['velbinning']
+    a12file = os.path.join(os.path.dirname(__file__), "curve_data_wise_small.sav")
+    a12data = readsav(a12file, python_dict=True)
+    a12data = a12data["curve_data_wise_small"][0]
+    a12_near_err = a12data["big_percentages_near"] / 100.0
+    a12_far_err = a12data["big_percentages_far"] / 100.0
+    a12_glongs = a12data["glong"]
+    a12_vlsrs = a12data["velbinning"]
     #
     # find matching longitudes and velocities
     #
-    best_glong = np.array([np.nanargmin(np.abs(gl-a12_glongs))
-                           for gl in glong])
-    best_vlsr = np.array([np.nanargmin(np.abs(vl-a12_vlsrs))
-                          for vl in vlsr])
+    best_glong = np.array([np.nanargmin(np.abs(gl - a12_glongs)) for gl in glong])
+    best_vlsr = np.array([np.nanargmin(np.abs(vl - a12_vlsrs)) for vl in vlsr])
     #
     # Get distance uncertainties
     #
     near_err = a12_near_err[best_glong, best_vlsr]
     far_err = a12_far_err[best_glong, best_vlsr]
-    tangent_err = np.nanmax(np.vstack((near_err, far_err)),axis=0)
+    tangent_err = np.nanmax(np.vstack((near_err, far_err)), axis=0)
     if input_scalar:
         return (near_err[0], far_err[0], tangent_err[0])
     return (near_err, far_err, tangent_err)
+
 
 def calc_hpd(samples, kdetype, alpha=0.683, pdf_bins=1000):
     """
@@ -352,7 +367,7 @@ def calc_hpd(samples, kdetype, alpha=0.683, pdf_bins=1000):
         The upper bound of the BCI
     """
     # check inputs
-    if (alpha <= 0.) or (alpha >= 1.):
+    if (alpha <= 0.0) or (alpha >= 1.0):
         raise ValueError("alpha should be between 0 and 1.")
     #
     # Fit KDE
@@ -362,12 +377,12 @@ def calc_hpd(samples, kdetype, alpha=0.683, pdf_bins=1000):
         # skip if fewer than two non-nans
         return (None, np.nan, np.nan, np.nan)
     try:
-        if kdetype == 'scipy':
+        if kdetype == "scipy":
             kde = gaussian_kde(samples[~nans])
-        elif kdetype == 'pyqt':
+        elif kdetype == "pyqt":
             kde = pyqt_kde.KDE1D(
-                samples[~nans], lower=0,
-                method=kde_methods.linear_combination)
+                samples[~nans], lower=0, method=kde_methods.linear_combination
+            )
         else:
             raise ValueError("Invalid KDE method: {0}".format(kdetype))
     except np.linalg.LinAlgError:
@@ -376,8 +391,7 @@ def calc_hpd(samples, kdetype, alpha=0.683, pdf_bins=1000):
     #
     # Compute PDF
     #
-    xdata = np.linspace(
-        np.nanmin(samples), np.nanmax(samples), pdf_bins)
+    xdata = np.linspace(np.nanmin(samples), np.nanmax(samples), pdf_bins)
     pdf = kde(xdata)
     #
     # Get the location of the mode
@@ -388,10 +402,9 @@ def calc_hpd(samples, kdetype, alpha=0.683, pdf_bins=1000):
     #
     # Reverse sort the PDF and xdata and find the BCI
     #
-    sort_pdf = sorted(
-        zip(xdata, pdf/np.sum(pdf)), key=lambda x: x[1], reverse=True)
-    cum_prob = 0.
-    bci_xdata = np.empty(len(xdata), dtype=float)*np.nan
+    sort_pdf = sorted(zip(xdata, pdf / np.sum(pdf)), key=lambda x: x[1], reverse=True)
+    cum_prob = 0.0
+    bci_xdata = np.empty(len(xdata), dtype=float) * np.nan
     for i, dat in enumerate(sort_pdf):
         cum_prob += dat[1]
         bci_xdata[i] = dat[0]

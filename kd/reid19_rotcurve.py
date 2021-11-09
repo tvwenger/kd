@@ -53,6 +53,7 @@ __Ustd = 10.27
 __Vstd = 15.32
 __Wstd = 7.74
 
+
 def nominal_params():
     """
     Return a dictionary containing the nominal rotation curve
@@ -66,9 +67,17 @@ def nominal_params():
           The nominal rotation curve parameter
     """
     params = {
-        'R0': __R0, 'Usun': __Usun, 'Vsun': __Vsun, 'Wsun': __Wsun,
-        'Upec': __Upec, 'Vpec': __Vpec, 'a2': __a2, 'a3': __a3}
+        "R0": __R0,
+        "Usun": __Usun,
+        "Vsun": __Vsun,
+        "Wsun": __Wsun,
+        "Upec": __Upec,
+        "Vpec": __Vpec,
+        "a2": __a2,
+        "a3": __a3,
+    }
     return params
+
 
 def resample_params(size=None):
     """
@@ -86,25 +95,35 @@ def resample_params(size=None):
         params['a1'], etc. : scalar or array of scalars
                              The re-sampled parameters
     """
-    kdefile = os.path.join(
-        os.path.dirname(__file__), 'reid19_params.pkl')
-    with open(kdefile, 'rb') as f:
+    kdefile = os.path.join(os.path.dirname(__file__), "reid19_params.pkl")
+    with open(kdefile, "rb") as f:
         kde = pickle.load(f)
     if size is None:
-        samples = kde['full'].resample(1)
+        samples = kde["full"].resample(1)
         params = {
-            'R0': samples[0][0], 'Usun': samples[1][0],
-            'Vsun': samples[2][0], 'Wsun': samples[3][0],
-            'Upec': samples[4][0], 'Vpec': samples[5][0],
-            'a2': samples[6][0], 'a3': samples[7][0]}
+            "R0": samples[0][0],
+            "Usun": samples[1][0],
+            "Vsun": samples[2][0],
+            "Wsun": samples[3][0],
+            "Upec": samples[4][0],
+            "Vpec": samples[5][0],
+            "a2": samples[6][0],
+            "a3": samples[7][0],
+        }
     else:
-        samples = kde['full'].resample(size)
+        samples = kde["full"].resample(size)
         params = {
-            'R0': samples[0], 'Usun': samples[1],
-            'Vsun': samples[2], 'Wsun': samples[3],
-            'Upec': samples[4], 'Vpec': samples[5],
-            'a2': samples[6], 'a3': samples[7]}
+            "R0": samples[0],
+            "Usun": samples[1],
+            "Vsun": samples[2],
+            "Wsun": samples[3],
+            "Upec": samples[4],
+            "Vpec": samples[5],
+            "a2": samples[6],
+            "a3": samples[7],
+        }
     return params
+
 
 def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
     """
@@ -129,30 +148,45 @@ def calc_theta(R, a2=__a2, a3=__a3, R0=__R0):
     #
     # Re-production of Reid+2019 FORTRAN code
     #
-    rho = R/(a2 * R0)
-    lam = (a3/1.5)**5.
+    rho = R / (a2 * R0)
+    lam = (a3 / 1.5) ** 5.0
     loglam = np.log10(lam)
-    term1 = 200. * lam**0.41
-    term2 = np.sqrt(0.8 + 0.49*loglam +
-                    0.75*np.exp(-0.4*lam)/(0.47 + 2.25*lam**0.4))
-    term3 = (0.72 + 0.44*loglam) * 1.97 * rho**1.22 / (rho**2. + 0.61)**1.43
-    term4 = 1.6 * np.exp(-0.4*lam) * rho**2. / (rho**2. + 2.25*lam**0.4)
+    term1 = 200.0 * lam ** 0.41
+    term2 = np.sqrt(
+        0.8 + 0.49 * loglam + 0.75 * np.exp(-0.4 * lam) / (0.47 + 2.25 * lam ** 0.4)
+    )
+    term3 = (0.72 + 0.44 * loglam) * 1.97 * rho ** 1.22 / (rho ** 2.0 + 0.61) ** 1.43
+    term4 = 1.6 * np.exp(-0.4 * lam) * rho ** 2.0 / (rho ** 2.0 + 2.25 * lam ** 0.4)
     #
     # Catch non-physical case where term3 + term4 < 0
     #
     term = term3 + term4
-    term[term < 0.] = np.nan
+    term[term < 0.0] = np.nan
     #
     # Circular velocity
     #
-    theta = term1/term2 * np.sqrt(term)
+    theta = term1 / term2 * np.sqrt(term)
     if input_scalar:
         return theta[0]
     return theta
 
-def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
-              Wsun=__Wsun, Upec=__Upec, Vpec=__Vpec, a2=__a2, a3=__a3,
-              Zsun=__Zsun, roll=__roll, peculiar=False):
+
+def calc_vlsr(
+    glong,
+    glat,
+    dist,
+    R0=__R0,
+    Usun=__Usun,
+    Vsun=__Vsun,
+    Wsun=__Wsun,
+    Upec=__Upec,
+    Vpec=__Vpec,
+    a2=__a2,
+    a3=__a3,
+    Zsun=__Zsun,
+    roll=__roll,
+    peculiar=False,
+):
     """
     Return the IAU-LSR velocity at a given Galactic longitude and
     line-of-sight distance.
@@ -193,15 +227,14 @@ def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
     # Convert distance to Galactocentric, catch small Rgal
     #
     Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
-    Rgal[Rgal < 1.e-6] = 1.e-6
+    Rgal[Rgal < 1.0e-6] = 1.0e-6
     az = kd_utils.calc_az(glong, glat, dist, R0=R0)
     cos_az = np.cos(np.deg2rad(az))
     sin_az = np.sin(np.deg2rad(az))
     #
     # Rotation curve circular velocity
     #
-    theta = calc_theta(
-        Rgal, a2=a2, a3=a3, R0=R0)
+    theta = calc_theta(Rgal, a2=a2, a3=a3, R0=R0)
     theta0 = calc_theta(R0, a2=a2, a3=a3, R0=R0)
     #
     # Add HMSFR peculiar motion
@@ -214,17 +247,17 @@ def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
         vR = 0.0
         vAz = theta
         vZ = 0.0
-    vXg = -vR*cos_az + vAz*sin_az
-    vYg = vR*sin_az + vAz*cos_az
+    vXg = -vR * cos_az + vAz * sin_az
+    vYg = vR * sin_az + vAz * cos_az
     vZg = vZ
     #
     # Convert to barycentric
     #
-    X = dist*cos_glat*cos_glong
-    Y = dist*cos_glat*sin_glong
-    Z = dist*sin_glat
+    X = dist * cos_glat * cos_glong
+    Y = dist * cos_glat * sin_glong
+    Z = dist * sin_glat
     # useful constants
-    sin_tilt = Zsun/1000./R0
+    sin_tilt = Zsun / 1000.0 / R0
     cos_tilt = np.cos(np.arcsin(sin_tilt))
     sin_roll = np.sin(np.deg2rad(roll))
     cos_roll = np.cos(np.deg2rad(roll))
@@ -233,17 +266,19 @@ def calc_vlsr(glong, glat, dist, R0=__R0, Usun=__Usun, Vsun=__Vsun,
     vYg = vYg - theta0 - Vsun
     vZg = vZg - Wsun
     # correct tilt and roll of Galactic midplane
-    vXg1 = vXg*cos_tilt - vZg*sin_tilt
+    vXg1 = vXg * cos_tilt - vZg * sin_tilt
     vYg1 = vYg
-    vZg1 = vXg*sin_tilt + vZg*cos_tilt
+    vZg1 = vXg * sin_tilt + vZg * cos_tilt
     vXh = vXg1
-    vYh = vYg1*cos_roll + vZg1*sin_roll
-    vZh = -vYg1*sin_roll + vZg1*cos_roll
-    vbary = (X*vXh + Y*vYh + Z*vZh)/dist
+    vYh = vYg1 * cos_roll + vZg1 * sin_roll
+    vZh = -vYg1 * sin_roll + vZg1 * cos_roll
+    vbary = (X * vXh + Y * vYh + Z * vZh) / dist
     #
     # Convert to IAU-LSR
     #
-    vlsr = vbary + (__Ustd*cos_glong + __Vstd*sin_glong)*cos_glat + __Wsun*sin_glat
+    vlsr = (
+        vbary + (__Ustd * cos_glong + __Vstd * sin_glong) * cos_glat + __Wsun * sin_glat
+    )
     if input_scalar:
         return vlsr[0]
     return vlsr

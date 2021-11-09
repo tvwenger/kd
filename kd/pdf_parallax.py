@@ -34,8 +34,9 @@ from kd.parallax import parallax
 from kd.kd_utils import calc_hpd
 
 # Solar Galactocentric radius and error from Reid+2019
-__R0 = 8.15 # kpc
-__R0_err = 0.15 # kpc
+__R0 = 8.15  # kpc
+__R0_err = 0.15  # kpc
+
 
 def calc_hpd_wrapper(args):
     """
@@ -43,9 +44,19 @@ def calc_hpd_wrapper(args):
     """
     return calc_hpd(args[0], args[1], alpha=args[2], pdf_bins=args[3])
 
-def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
-                 R0_err=__R0_err, pdf_bins=1000, num_samples=10000,
-                 plot_pdf=False, plot_prefix='pdf_'):
+
+def pdf_parallax(
+    glong,
+    plx,
+    plx_err=None,
+    dist_max=30.0,
+    R0=__R0,
+    R0_err=__R0_err,
+    pdf_bins=1000,
+    num_samples=10000,
+    plot_pdf=False,
+    plot_prefix="pdf_",
+):
     """
     Return the parallax Galactocentric radius and distance given a
     parallax and parallax uncertainty. Generate distance posterior by
@@ -111,26 +122,34 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
     glong, plx = np.atleast_1d(glong, plx)
     if glong.shape != plx.shape:
         raise ValueError("glong and plx must have same shape")
-    if (plx_err is not None and not np.isscalar(plx_err) and
-        plx_err.shape != plx.shape):
+    if plx_err is not None and not np.isscalar(plx_err) and plx_err.shape != plx.shape:
         raise ValueError("plx_err must be scalar or have same shape as plx")
     #
     # Storage for final PDF parallax distance results
     #
-    results = {"Rgal": np.zeros(plx.shape),
-               "Rgal_kde": np.empty(shape=plx.shape, dtype=object),
-               "Rgal_err_neg": np.zeros(plx.shape),
-               "Rgal_err_pos": np.zeros(plx.shape),
-               "distance": np.zeros(plx.shape),
-               "distance_kde": np.empty(shape=plx.shape, dtype=object),
-               "distance_err_neg": np.zeros(plx.shape),
-               "distance_err_pos": np.zeros(plx.shape)}
+    results = {
+        "Rgal": np.zeros(plx.shape),
+        "Rgal_kde": np.empty(shape=plx.shape, dtype=object),
+        "Rgal_err_neg": np.zeros(plx.shape),
+        "Rgal_err_pos": np.zeros(plx.shape),
+        "distance": np.zeros(plx.shape),
+        "distance_kde": np.empty(shape=plx.shape, dtype=object),
+        "distance_err_neg": np.zeros(plx.shape),
+        "distance_err_pos": np.zeros(plx.shape),
+    }
     #
     # Calculate parallax distances
     #
     plx_out = parallax(
-        glong, plx, plx_err=plx_err, dist_max=dist_max, R0=R0,
-        R0_err=R0_err, resample=True, size=num_samples)
+        glong,
+        plx,
+        plx_err=plx_err,
+        dist_max=dist_max,
+        R0=R0,
+        R0_err=R0_err,
+        resample=True,
+        size=num_samples,
+    )
     #
     # Set up multiprocessing for fitting KDEs
     #
@@ -139,8 +158,7 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
     args = []
     for kdtype, kdetype in zip(kdtypes, kdetypes):
         for i in np.ndindex(glong.shape):
-            args.append((
-                plx_out[kdtype][i], kdetype, 0.683, pdf_bins))
+            args.append((plx_out[kdtype][i], kdetype, 0.683, pdf_bins))
     with mp.Pool() as pool:
         kde_results = pool.map(calc_hpd_wrapper, args)
     #
@@ -151,9 +169,9 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
         for i in np.ndindex(glong.shape):
             kde, mode, lower, upper = kde_results[nresult]
             results[kdtype][i] = mode
-            results[kdtype+"_kde"][i] = kde
-            results[kdtype+"_err_neg"][i] = mode-lower
-            results[kdtype+"_err_pos"][i] = upper-mode
+            results[kdtype + "_kde"][i] = kde
+            results[kdtype + "_err_neg"][i] = mode - lower
+            results[kdtype + "_err_pos"][i] = upper - mode
             nresult += 1
     #
     # Plot PDFs and results
@@ -166,8 +184,9 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
             fig, axes = plt.subplots(2, figsize=(8.5, 5.5))
             axes[0].set_title(
                 r"PDFs for ($\ell$, $\pi$) = ("
-                "{0:.1f}".format(glong[i])+r"$^\circ$, "
-                "{0:.3f}".format(plx[i])+r" mas)")
+                "{0:.1f}".format(glong[i]) + r"$^\circ$, "
+                "{0:.3f}".format(plx[i]) + r" mas)"
+            )
             #
             # Compute "traditional" parallax distances
             #
@@ -177,46 +196,44 @@ def pdf_parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
             for ax, kdtype, label in zip(axes, kdtypes, labels):
                 out = plx_out[kdtype][i]
                 peak = results[kdtype][i]
-                kde = results[kdtype+"_kde"][i]
-                err_neg = results[kdtype+"_err_neg"][i]
-                err_pos = results[kdtype+"_err_pos"][i]
+                kde = results[kdtype + "_kde"][i]
+                err_neg = results[kdtype + "_err_neg"][i]
+                err_pos = results[kdtype + "_err_pos"][i]
                 # find bad data
                 out = out[~np.isnan(out)]
                 # skip if kde failed (all data is bad)
                 if kde is None:
                     continue
                 # set-up bins
-                binwidth = (np.max(out)-np.min(out))/20.
-                bins = np.arange(
-                    np.min(out), np.max(out)+binwidth, binwidth)
-                distwidth = (np.max(out)-np.min(out))/200.
-                dists = np.arange(
-                    np.min(out), np.max(out)+distwidth, distwidth)
+                binwidth = (np.max(out) - np.min(out)) / 20.0
+                bins = np.arange(np.min(out), np.max(out) + binwidth, binwidth)
+                distwidth = (np.max(out) - np.min(out)) / 200.0
+                dists = np.arange(np.min(out), np.max(out) + distwidth, distwidth)
                 pdf = kde(dists)
                 ax.hist(
-                    out, bins=bins, density=True, facecolor='white',
-                    edgecolor='black', lw=2, zorder=1)
-                ax.plot(dists, pdf, 'k-', zorder=3)
-                err_dists = np.arange(
-                    peak-err_neg, peak+err_pos, distwidth)
+                    out,
+                    bins=bins,
+                    density=True,
+                    facecolor="white",
+                    edgecolor="black",
+                    lw=2,
+                    zorder=1,
+                )
+                ax.plot(dists, pdf, "k-", zorder=3)
+                err_dists = np.arange(peak - err_neg, peak + err_pos, distwidth)
                 err_pdf = kde(err_dists)
                 ax.fill_between(
-                    err_dists, 0, err_pdf, color='gray', alpha=0.5,
-                    zorder=2)
-                ax.axvline(
-                    peak, linestyle='solid', color='k',
-                    zorder=3)
-                ax.axvline(
-                    plx_d[kdtype], linestyle='dashed', color='k',
-                    zorder=3)
+                    err_dists, 0, err_pdf, color="gray", alpha=0.5, zorder=2
+                )
+                ax.axvline(peak, linestyle="solid", color="k", zorder=3)
+                ax.axvline(plx_d[kdtype], linestyle="dashed", color="k", zorder=3)
                 ax.set_xlabel(label)
                 ax.set_ylabel("Normalized PDF")
                 ax.set_xlim(np.min(out), np.max(out))
                 # turn off grid
                 ax.grid(False)
             plt.tight_layout()
-            fname = "{0}{1}_{2}.pdf".format(
-                plot_prefix, glong[i], plx[i])
+            fname = "{0}{1}_{2}.pdf".format(plot_prefix, glong[i], plx[i])
             plt.savefig(fname)
             plt.close(fig)
     if input_scalar:

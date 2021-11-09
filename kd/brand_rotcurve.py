@@ -35,8 +35,9 @@ from kd import kd_utils
 __a1 = 1.0074
 __a2 = 0.0382
 __a3 = 0.00698
-__R0 = 8.5 # kpc
-__theta0 = 220.0 # km/s
+__R0 = 8.5  # kpc
+__theta0 = 220.0  # km/s
+
 
 def nominal_params():
     """
@@ -50,10 +51,9 @@ def nominal_params():
         params['a1'], etc. : scalar
            The nominal rotation curve parameter
     """
-    params = {
-        'a1': __a1, 'a2': __a2, 'a3': __a3, 'R0': __R0,
-        'theta0': __theta0}
+    params = {"a1": __a1, "a2": __a2, "a3": __a3, "R0": __R0, "theta0": __theta0}
     return params
+
 
 def resample_params(size=None):
     """
@@ -68,8 +68,8 @@ def resample_params(size=None):
     """
     raise ValueError("brand_rotcurve.py does not support resampling")
 
-def calc_theta(R, a1=__a1, a2=__a2, a3=__a3,
-               R0=__R0, theta0=__theta0):
+
+def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0, theta0=__theta0):
     """
     Return circular orbit speed at a given Galactocentric radius.
 
@@ -90,13 +90,13 @@ def calc_theta(R, a1=__a1, a2=__a2, a3=__a3,
     """
     input_scalar = np.isscalar(R)
     R = np.atleast_1d(R)
-    theta = theta0 * (a1*(R/R0)**a2 + a3)
+    theta = theta0 * (a1 * (R / R0) ** a2 + a3)
     if input_scalar:
         return theta[0]
     return theta
 
-def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0,
-              theta0=__theta0):
+
+def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0, theta0=__theta0):
     """
     Return the LSR velocity at a given Galactic longitude and
     line-of-sight distance.
@@ -125,17 +125,16 @@ def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0,
     # Convert distance to Galactocentric radius, catch small Rgal
     #
     Rgal = kd_utils.calc_Rgal(glong, dist, R0=R0)
-    Rgal[Rgal < 1.e-6] = 1.e-6
+    Rgal[Rgal < 1.0e-6] = 1.0e-6
     #
     # Rotation curve circular velocity
     #
-    theta = calc_theta(
-        Rgal, a1=a1, a2=a2, a3=a3, R0=R0, theta0=theta0)
+    theta = calc_theta(Rgal, a1=a1, a2=a2, a3=a3, R0=R0, theta0=theta0)
     #
     # Now take circular velocity and convert to LSR velocity
     #
     vlsr = R0 * np.sin(np.deg2rad(glong))
-    vlsr = vlsr * ((theta/Rgal) - theta0/R0)
+    vlsr = vlsr * ((theta / Rgal) - theta0 / R0)
     if input_scalar:
         return vlsr[0]
     return vlsr

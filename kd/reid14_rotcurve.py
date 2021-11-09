@@ -33,8 +33,8 @@ from kd import kd_utils
 #
 # Reid+2014 rotation curve parameters and uncertainties
 #
-__a1 = 241.  # km/s V(R_opt)
-__a1_err = 8.
+__a1 = 241.0  # km/s V(R_opt)
+__a1_err = 8.0
 __a2 = 0.90  # R_opt/ R0
 __a2_err = 0.06
 __a3 = 1.46  # 1.5*(L/L*)^0.2
@@ -55,8 +55,7 @@ def nominal_params():
         params['a1'], etc. : scalar
           The nominal rotation curve parameter
     """
-    params = {
-        'a1': __a1, 'a2': __a2, 'a3': __a3, 'R0': __R0}
+    params = {"a1": __a1, "a2": __a2, "a3": __a3, "R0": __R0}
     return params
 
 
@@ -76,10 +75,11 @@ def resample_params(size=None):
                              The re-sampled parameters
     """
     params = {
-        'a1': np.random.normal(loc=__a1, scale=__a1_err, size=size),
-        'a2': np.random.normal(loc=__a2, scale=__a2_err, size=size),
-        'a3': np.random.normal(loc=__a3, scale=__a3_err, size=size),
-        'R0': np.random.normal(loc=__R0, scale=__R0_err, size=size)}
+        "a1": np.random.normal(loc=__a1, scale=__a1_err, size=size),
+        "a2": np.random.normal(loc=__a2, scale=__a2_err, size=size),
+        "a3": np.random.normal(loc=__a3, scale=__a3_err, size=size),
+        "R0": np.random.normal(loc=__R0, scale=__R0_err, size=size),
+    }
     return params
 
 
@@ -106,18 +106,18 @@ def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     #
     # Equations 8, 9, 10, 11a, 11b in Persic+1996
     #
-    x = R/(a2 * R0)
-    LLstar = (a3/1.5)**5.
-    beta = 0.72 + 0.44*np.log10(LLstar)
+    x = R / (a2 * R0)
+    LLstar = (a3 / 1.5) ** 5.0
+    beta = 0.72 + 0.44 * np.log10(LLstar)
     # Disk component Vd^2 / V(R_opt)^2
-    Vd2 = beta * 1.97 * x**1.22 / (x**2. + 0.78**2.)**1.43
+    Vd2 = beta * 1.97 * x ** 1.22 / (x ** 2.0 + 0.78 ** 2.0) ** 1.43
     # Halo component Vh^2 / V(R_opt)^2
-    Vh2 = (1.-beta)*(1.+a3**2.)*x**2./(x**2. + a3**2.)
+    Vh2 = (1.0 - beta) * (1.0 + a3 ** 2.0) * x ** 2.0 / (x ** 2.0 + a3 ** 2.0)
     #
     # Catch non-physical case where Vd2 + Vh2 < 0
     #
     Vtot = Vd2 + Vh2
-    Vtot[Vtot < 0.] = np.nan
+    Vtot[Vtot < 0.0] = np.nan
     #
     # Circular velocity
     #
@@ -155,18 +155,17 @@ def calc_vlsr(glong, glat, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0):
     # Convert distance to Galactocentric radius, catch small Rgal
     #
     Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
-    Rgal[Rgal < 1.e-6] = 1.e-6
+    Rgal[Rgal < 1.0e-6] = 1.0e-6
     #
     # Rotation curve circular velocity
     #
-    theta = calc_theta(
-        Rgal, a1=a1, a2=a2, a3=a3, R0=R0)
+    theta = calc_theta(Rgal, a1=a1, a2=a2, a3=a3, R0=R0)
     theta0 = calc_theta(R0, a1=a1, a2=a2, a3=a3, R0=R0)
     #
     # Now take circular velocity and convert to LSR velocity
     #
     vlsr = R0 * np.sin(np.deg2rad(glong))
-    vlsr = vlsr * ((theta/Rgal) - (theta0/R0))
+    vlsr = vlsr * ((theta / Rgal) - (theta0 / R0))
     if input_scalar:
         return vlsr[0]
     return vlsr
