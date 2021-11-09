@@ -4,7 +4,7 @@ parallax.py
 
 Utility to calculate parallax distances the traditional way.
 
-Copyright(C) 2017-2020 by
+Copyright(C) 2017-2021 by
 Trey V. Wenger; tvwenger@gmail.com
 
 GNU General Public License v3 (GNU GPLv3)
@@ -32,15 +32,16 @@ import pathos.multiprocessing as mp
 from kd import kd_utils
 
 # Solar Galactocentric radius and error from Reid+2019
-__R0 = 8.15 # kpc
-__R0_err = 0.15 # kpc
+__R0 = 8.15  # kpc
+__R0_err = 0.15  # kpc
+
 
 class Worker:
     """
     Multiprocessing wrapper class
     """
-    def __init__(self, glong, plx, plx_err, dist_max,
-                 resample, size, R0, R0_err):
+
+    def __init__(self, glong, plx, plx_err, dist_max, resample, size, R0, R0_err):
         self.glong = glong
         self.plx = plx
         self.plx_err = plx_err
@@ -59,27 +60,34 @@ class Worker:
         # Resample parallax and R0
         #
         if self.resample:
-            plx_sample = np.random.normal(
-                loc=self.plx, scale=self.plx_err)
-            R0_sample = np.random.normal(
-                loc=self.R0, scale=self.R0_err)
+            plx_sample = np.random.normal(loc=self.plx, scale=self.plx_err)
+            R0_sample = np.random.normal(loc=self.R0, scale=self.R0_err)
         else:
             plx_sample = self.plx
             R0_sample = self.R0
         #
         # Compute distances from parallax, catch large distances
         #
-        distance = 1./plx_sample # kpc
+        distance = 1.0 / plx_sample  # kpc
         distance[distance > self.dist_max] = np.nan
-        distance[distance < 0.] = np.nan
+        distance[distance < 0.0] = np.nan
         #
         # Compute Galactocentric radius
         #
         Rgal = kd_utils.calc_Rgal(self.glong, distance, R0=R0_sample)
         return (distance, Rgal)
 
-def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
-             R0_err=__R0_err, resample=False, size=1):
+
+def parallax(
+    glong,
+    plx,
+    plx_err=None,
+    dist_max=30.0,
+    R0=__R0,
+    R0_err=__R0_err,
+    resample=False,
+    size=1,
+):
     """
     Compute parallax distance and Galactocentric radius for a given
     Galactic longitude and parallax.
@@ -120,7 +128,7 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
     plx = plx.flatten()
     if glong.shape != plx.shape:
         raise ValueError("glong and plx must have same size")
-    if (plx_err is not None and not np.isscalar(plx_err)):
+    if plx_err is not None and not np.isscalar(plx_err):
         plx_err = plx_err.flatten()
         if plx_err.shape != plx.shape:
             raise ValueError("plx_err must be scalar or have same shape as plx")
@@ -128,25 +136,24 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
     # Default plx_err to 0, sample size to 1
     #
     elif plx_err is None:
-        plx_err = 0.
+        plx_err = 0.0
     if not resample:
         size = 1
     if size < 1:
         raise ValueError("size must be >= 1")
     # ensure range [0,360) degrees
-    glong = glong % 360.
+    glong = glong % 360.0
     #
     # Initialize worker
     #
-    worker = Worker(glong, plx, plx_err, dist_max,
-                    resample, size, R0, R0_err)
+    worker = Worker(glong, plx, plx_err, dist_max, resample, size, R0, R0_err)
     with mp.Pool() as pool:
         results = pool.map(worker.work, range(size))
     #
     # Store results
     #
-    distance_samples = np.ones((len(glong), size), dtype=float)*np.nan
-    Rgal_samples = np.ones((len(glong), size), dtype=float)*np.nan
+    distance_samples = np.ones((len(glong), size), dtype=float) * np.nan
+    Rgal_samples = np.ones((len(glong), size), dtype=float) * np.nan
     for snum, result in enumerate(results):
         distance_samples[:, snum] = result[0]
         Rgal_samples[:, snum] = result[1]
@@ -165,5 +172,5 @@ def parallax(glong, plx, plx_err=None, dist_max=30., R0=__R0,
             if size == 1:
                 output[key] = output[key].reshape(inp_shape)
             else:
-                output[key] = output[key].reshape(inp_shape+(size,))
+                output[key] = output[key].reshape(inp_shape + (size,))
     return output
