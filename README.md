@@ -61,6 +61,7 @@ This module includes three rotation curves:
 1. Brand, J., & Blitz, L. 1993, A&A, 275, 67 (`brand_rotcurve.py`)
 2. Reid, M. J., Menten, K. M., Brunthaler, A., et al. 2014, ApJ, 783, 130 (`reid14_rotcurve.py`)
 3. Reid, M. J., Menten, K. M., Brunthaler, A., et al. 2019, ApJ, 885, 131 (`reid19_rotcurve.py`)
+4. A flat rotation curve (`flat_rotcurve.py`)
 
 These rotation curve scripts, and any new rotation curve scripts you wish to add, *must* include the following four functions:
 1. `params_nominal()` which returns the nominal rotation curve parameters as a dictionary
