@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 2017-05-24 Trey V. Wenger
 2020-02-19 Trey V. Wenger updates for v2.0
+2021-11-09 Trey V. Wenger fix bug in calc_vlsr
 """
 
 import numpy as np
@@ -96,14 +97,14 @@ def calc_theta(R, a1=__a1, a2=__a2, a3=__a3, R0=__R0, theta0=__theta0):
     return theta
 
 
-def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0, theta0=__theta0):
+def calc_vlsr(glong, glat, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0, theta0=__theta0):
     """
     Return the LSR velocity at a given Galactic longitude and
     line-of-sight distance.
 
     Parameters:
-      glong :: scalar or array of scalars
-        Galactic longitude (deg).
+      glong, glat :: scalar or array of scalars
+        Galactic longitude and latitude (deg).
 
       dist :: scalar or array of scalars
         line-of-sight distance (kpc).
@@ -119,12 +120,12 @@ def calc_vlsr(glong, dist, a1=__a1, a2=__a2, a3=__a3, R0=__R0, theta0=__theta0):
       vlsr :: scalar or array of scalars
         LSR velocity (km/s).
     """
-    input_scalar = np.isscalar(glong) and np.isscalar(dist)
-    glong, dist = np.atleast_1d(glong, dist)
+    input_scalar = np.isscalar(glong) and np.isscalar(glat) and np.isscalar(dist)
+    glong, glat, dist = np.atleast_1d(glong, glat, dist)
     #
     # Convert distance to Galactocentric radius, catch small Rgal
     #
-    Rgal = kd_utils.calc_Rgal(glong, dist, R0=R0)
+    Rgal = kd_utils.calc_Rgal(glong, glat, dist, R0=R0)
     Rgal[Rgal < 1.0e-6] = 1.0e-6
     #
     # Rotation curve circular velocity
