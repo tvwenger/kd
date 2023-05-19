@@ -15,23 +15,18 @@ Utilities to calculate kinematic distances and kinematic distance uncertainties.
 6. General improvements in readability and performance.
 
 ## Requirements
-The following packages are required for this module to work "out-of-the-box"
-1. `numpy`
-2. `scipy`
-3. `matplotlib`
-4. `pyqt_fit` (N.B. The currently available version on PyPI, as of January 2020, has a dependency issue. I have [forked the repository](https://github.com/tvwenger/pyqt-fit) and corrected the issue.)
-5. `pathos` (for multiprocessing)
+This package depends on `pyqt-fit`, which is apparently no longer
+maintained. For the time being, I have forked the repository and it
+must be installed alongside `kd` in an enviornment with an older
+version of python.
 
-The easiest way to install this package is
+Installation via `conda`:
 ```bash
+conda create --name kd
+conda activate kd
+conda install -c conda-forge python==3.7.2 numpy==1.19.0
 pip install git+https://github.com/tvwenger/pyqt-fit.git
 pip install git+https://github.com/tvwenger/kd.git
-```
-
-Alternatively, download the code and install:
-```bash
-git clone https://github.com/tvwenger/pyqt-fit.git; cd pyqt-fit; python setup.py install; cd ..
-git clone https://github.com/tvwenger/kd.git; cd kd; python setup.py install; cd ..
 ```
 
 ## General Utilities
