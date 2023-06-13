@@ -16,18 +16,25 @@ Utilities to calculate kinematic distances and kinematic distance uncertainties.
 
 ## Requirements
 This package depends on `pyqt-fit`, which is apparently no longer
-maintained. For the time being, I have forked the repository and it
-must be installed alongside `kd` in an enviornment with an older
-version of python.
+maintained. For the time being, I have forked the repository and am attempting
+to keep it working with the latest version of python.
 
 Installation via `conda`:
 ```bash
-conda create --name kd
+conda create --name kd -c conda-forge python
 conda activate kd
-conda install -c conda-forge python==3.7.2 numpy==1.19.0
+# install pyqt-fit with cython support (faster)
+pip install git+https://github.com/tvwenger/pyqt-fit.git[cython]
+# install pyqt-fit without cython support (slower)
 pip install git+https://github.com/tvwenger/pyqt-fit.git
+
+# install kd
 pip install git+https://github.com/tvwenger/kd.git
 ```
+
+N.B. If you install `pyqt-fit` with cython support, then you will get a bunch of warning
+messages the first time you import `pyqt_fit`. These warnings can be safely
+ignored.
 
 ## General Utilities
 The script `kd_utils.py` includes several functions relevant to computing kinematic distances:
