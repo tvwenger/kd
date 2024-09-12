@@ -27,6 +27,6 @@ setup(
     author="Trey V. Wenger",
     author_email="tvwenger@gmail.com",
     packages=["kd"],
-    install_requires=["numpy", "matplotlib", "scipy", "pathos"],
+    install_requires=["numpy<2.0.0", "matplotlib", "scipy", "pathos"],
     package_data={"kd": ["curve_data_wise_small.sav", "reid19_params.pkl"]},
 )

@@ -21,7 +21,7 @@ to keep it working with the latest version of python.
 
 Installation via `conda`:
 ```bash
-conda create --name kd -c conda-forge python
+conda create --name kd -c conda-forge python "numpy<2.0.0" scipy matplotlib pip
 conda activate kd
 # install pyqt-fit with cython support (faster)
 pip install git+https://github.com/tvwenger/pyqt-fit.git#egg=pyqt-fit[cython]
